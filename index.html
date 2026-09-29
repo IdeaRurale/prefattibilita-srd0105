@@ -171,17 +171,59 @@
   <div class="chk"><input type="checkbox" id="affitto"><span>Gli investimenti ricadono (anche in parte) su terreni o fabbricati <b>in affitto o altro titolo idoneo</b> diverso dalla proprietà (richiede DOC02; il comodato d'uso ordinario non è titolo ammesso dal bando)</span></div>
   <div class="chk"><input type="checkbox" id="comodato"><span>Gli investimenti ricadono su terreni o fabbricati in <b>comodato d'uso ordinario</b> (criticità CR32: titolo non ammesso, salvo beni confiscati assegnati dall'ANBSC). Se selezioni le particelle nelle voci di spesa, il controllo è fatto voce per voce.</span></div>
   <div class="grid" style="margin-top:8px">
-    <label class="f">Data di nascita titolare
-      <input type="date" id="nascita" oninput="aggiornaEta(); aggiornaAliquotaPreview()">
+    <label class="f">Data di nascita titolare / rappresentante legale
+      <input type="date" id="nascita" oninput="aggiornaSoggetto()">
       <span class="eta-info" id="etaInfo"></span>
     </label>
     <label class="f">Genere titolare
-      <select id="genere" onchange="aggiornaEta(); aggiornaAliquotaPreview()">
+      <select id="genere" onchange="aggiornaSoggetto()">
         <option value="M">Uomo</option>
         <option value="F">Donna</option>
-        <option value="NA">Società / non applicabile</option>
+        <option value="NA">Società</option>
       </select>
     </label>
+  </div>
+  <div id="boxSocieta" class="part-box" style="display:none">
+    <div class="part-title">Società: rappresentante legale e compagine sociale (criterio 4.1 e aliquota 80%)</div>
+    <div class="grid">
+      <label class="f">Rappresentante legale
+        <input type="text" id="rlNome" placeholder="Cognome Nome" oninput="aggiornaSoggetto()">
+      </label>
+      <label class="f">Codice fiscale rappresentante legale
+        <input type="text" id="rlCf" maxlength="16" placeholder="16 caratteri" oninput="aggiornaDaCfRl(); aggiornaSoggetto()">
+        <small>Genere e data di nascita si ricavano dal codice fiscale.</small>
+      </label>
+      <label class="f">Genere rappresentante legale
+        <select id="rlGenere" onchange="aggiornaSoggetto()">
+          <option value="">—</option>
+          <option value="M">Uomo</option>
+          <option value="F">Donna</option>
+        </select>
+      </label>
+      <label class="f">Tipo di società
+        <select id="tipoSoc" onchange="aggiornaSoggetto()">
+          <option value="PERS">Società di persone (s.s., s.n.c., s.a.s.)</option>
+          <option value="CAP">Società di capitali (s.r.l., s.p.a.)</option>
+          <option value="COOP">Cooperativa</option>
+        </select>
+      </label>
+    </div>
+    <div id="socPersone" class="grid" style="margin-top:8px">
+      <label class="f">N. soci <small>(nelle s.a.s. solo gli accomandatari)</small>
+        <input type="number" id="socTot" min="0" step="1" placeholder="es. 2" oninput="aggiornaSoggetto()">
+      </label>
+      <label class="f">di cui giovani <small>(meno di 41 anni, insediati negli ultimi 5 anni)</small>
+        <input type="number" id="socGiovani" min="0" step="1" placeholder="0" oninput="aggiornaSoggetto()">
+      </label>
+      <label class="f">di cui donne
+        <input type="number" id="socDonne" min="0" step="1" placeholder="0" oninput="aggiornaSoggetto()">
+      </label>
+    </div>
+    <div id="socCapitali" style="margin-top:8px;display:none">
+      <div class="chk"><input type="checkbox" id="capGiovani" onchange="aggiornaSoggetto()"><span>Oltre il 50% del capitale sottoscritto da <b>giovani</b> <b>e</b> maggioranza degli amministratori giovani</span></div>
+      <div class="chk"><input type="checkbox" id="capDonne" onchange="aggiornaSoggetto()"><span>Oltre il 50% del capitale sottoscritto da <b>donne</b> <b>e</b> maggioranza degli amministratori donne</span></div>
+    </div>
+    <p class="hint" id="socEsito" style="margin-top:6px"></p>
   </div>
 </fieldset>
 
@@ -280,7 +322,7 @@
 <fieldset>
   <legend>6 · Caratteristiche soggetto richiedente (P4 — max 43 pt)</legend>
   <p class="hint">Il criterio "Giovane agricoltore o Donna" (10 pt) è acquisito come dichiarazione preliminare e va verificato con la documentazione in fase di incarico. Giovane: meno di 41 anni alla presentazione della DdS e insediato negli ultimi 5 anni. Società: di capitali, oltre il 50% del capitale e maggioranza degli amministratori giovani/donne; di persone, almeno 2/3 dei soci (accomandatari nelle s.a.s.). Con soli due soci, entrambi devono avere il requisito (FAQ 06/08/2026).</p>
-  <div class="chk"><input type="checkbox" id="p4_giovane" onchange="aggiornaAliquotaPreview(); aggiornaEta()"><span><b>Giovane agricoltore</b> dichiarato (10 pt e aliquota 80%, da verificare)</span></div>
+  <div class="chk"><input type="checkbox" id="p4_giovane" onchange="aggiornaSoggetto()"><span><b>Giovane agricoltore</b> dichiarato (10 pt e aliquota 80%, da verificare) <small>— per le società si imposta dalla compagine sociale (sezione 1)</small></span></div>
   <div class="chk"><input type="checkbox" id="p4_cdiap"><span>Possesso qualifica <b>CD o IAP</b> (10 pt)</span></div>
   <div class="chk"><input type="checkbox" id="p4_dop"><span>Adesione regimi <b>DOP / IGP / Prodotti di Puglia</b> (5 pt)</span></div>
   <div class="chk"><input type="checkbox" id="p4_bio"><span>Adesione <b>Agricoltura Biologica</b> con l'<b>intera superficie aziendale</b> notificata (3 pt)</span></div>
@@ -779,8 +821,84 @@ function aggiornaEta(){
   const eta = etaAl(val("nascita"), DATA_RIF_DDS);
   if (eta==null){ el.textContent = ""; return; }
   const ok = eta < 41;
+  if (val("genere")==="NA"){
+    el.style.color = "var(--grey)";
+    el.textContent = "Età del rappresentante legale al 22/10/2026: "+eta+" anni (per le società conta la compagine sociale, sotto)";
+    return;
+  }
   el.style.color = ok ? "var(--blue)" : (chk("p4_giovane") ? "var(--red)" : "var(--grey)");
   el.textContent = "Età al 22/10/2026 (scadenza DdS): "+eta+" anni"+(ok ? " — compatibile con giovane agricoltore (verificare insediamento negli ultimi 5 anni)" : " — requisito giovane (meno di 41 anni) non soddisfatto");
+}
+
+// Codice fiscale di persona fisica → genere e data di nascita (senza omocodia)
+function infoDaCf(cf){
+  const m = String(cf||"").toUpperCase().trim().match(/^[A-Z]{6}(\d{2})([ABCDEHLMPRST])(\d{2})[A-Z]\d{3}[A-Z]$/);
+  if (!m) return null;
+  let gg = +m[3];
+  const genere = gg > 40 ? "F" : "M";
+  if (gg > 40) gg -= 40;
+  const aa = +m[1], oggiAA = new Date().getFullYear() % 100;
+  const anno = aa > oggiAA ? 1900 + aa : 2000 + aa;
+  const mese = "ABCDEHLMPRST".indexOf(m[2]) + 1;
+  return { genere, nascita: anno+"-"+String(mese).padStart(2,"0")+"-"+String(gg).padStart(2,"0") };
+}
+function aggiornaDaCfRl(){
+  const info = infoDaCf(val("rlCf"));
+  if (!info) return;
+  document.getElementById("rlGenere").value = info.genere;
+  document.getElementById("nascita").value = info.nascita;
+}
+
+// Requisito giovane/donna (criterio 4.1 e aliquota 80%).
+// Ditta individuale: titolare (giovane dichiarato con meno di 41 anni alla DdS; donna dal genere).
+// Società (Avviso par. 12 e 16 come modificati dalla DAdG 49/2026; FAQ 06/08/2026):
+// - di persone: almeno 2/3 dei soci (accomandatari nelle s.a.s.) giovani o donne;
+// - di capitali: oltre il 50% del capitale e maggioranza degli amministratori giovani o donne.
+// Il rappresentante legale da solo non basta: è riportato come dato informativo.
+function statoSoggetto(){
+  const eta = etaAl(val("nascita"), DATA_RIF_DDS);
+  if (val("genere") !== "NA"){
+    const dich = chk("p4_giovane");
+    const fuoriEta = dich && eta!=null && eta >= 41;
+    return { societa:false, giovane: dich && !fuoriEta, donna: val("genere")==="F", eta, fuoriEta, nota:"" };
+  }
+  const tipo = val("tipoSoc");
+  let giovane = false, donna = false, nota = "", compagineNota = "";
+  if (tipo === "PERS"){
+    const tot = parseInt(val("socTot"))||0, g = parseInt(val("socGiovani"))||0, d = parseInt(val("socDonne"))||0;
+    if (!tot) nota = "Indica il numero di soci (o di accomandatari) e quanti sono giovani o donne.";
+    else {
+      giovane = g / tot >= 2/3; donna = d / tot >= 2/3;
+      const min = Math.ceil(tot * 2 / 3 - 1e-9);
+      compagineNota = "giovani "+g+"/"+tot+", donne "+d+"/"+tot+" soci";
+      nota = "Società di persone: "+compagineNota+" (ne servono almeno "+min+" su "+tot+")."+(tot===2 ? " Con due soci devono avere il requisito entrambi (FAQ 06/08/2026)." : "");
+    }
+  } else {
+    giovane = chk("capGiovani"); donna = chk("capDonne");
+    compagineNota = "capitale e amministratori: giovani "+(giovane?"sì":"no")+", donne "+(donna?"sì":"no");
+    nota = (tipo==="COOP" ? "Cooperativa (regola delle società di capitali, da verificare con lo statuto)" : "Società di capitali")+": servono oltre il 50% del capitale e la maggioranza degli amministratori giovani o donne.";
+  }
+  const rl = { nome: val("rlNome"), genere: val("rlGenere"), eta };
+  const rlGiovane = eta!=null && eta < 41, rlDonna = rl.genere === "F";
+  if ((rlGiovane && !giovane) || (rlDonna && !donna))
+    nota += " Il rappresentante legale è "+[rlGiovane && !giovane ? "giovane" : null, rlDonna && !donna ? "donna" : null].filter(Boolean).join(" e ")+", ma da solo non basta: conta la compagine sociale.";
+  return { societa:true, tipo, giovane, donna, eta, fuoriEta:false, nota, compagineNota, rl };
+}
+function aggiornaSoggetto(){
+  const soc = val("genere") === "NA";
+  const box = document.getElementById("boxSocieta"); if (!box) return;
+  box.style.display = soc ? "" : "none";
+  const pers = val("tipoSoc") === "PERS";
+  document.getElementById("socPersone").style.display = pers ? "" : "none";
+  document.getElementById("socCapitali").style.display = pers ? "none" : "";
+  const s = statoSoggetto();
+  const cb = document.getElementById("p4_giovane");
+  // per le società la spunta segue la compagine; tornando a una ditta individuale va ridichiarata
+  if (soc){ cb.checked = s.giovane; cb.disabled = true; }
+  else if (cb.disabled){ cb.disabled = false; cb.checked = false; }
+  document.getElementById("socEsito").textContent = soc ? ("Esito: giovane "+(s.giovane?"SÌ":"no")+" · donna "+(s.donna?"SÌ":"no")+". "+s.nota) : "";
+  aggiornaEta();
+  aggiornaAliquotaPreview();
 }
 
 function calcola(vociParam){
@@ -803,11 +921,13 @@ function calcola(vociParam){
   };
 
   // ---- Qualifiche dichiarate in fase preliminare ----
-  // Giovane: meno di 41 anni alla DdS (riferimento prudenziale: scadenza del 22/10/2026).
-  const eta = etaAl(inp.nascita, DATA_RIF_DDS);
-  const giovaneFuoriEta = inp.p4.giovane && eta!=null && eta >= 41 && inp.genere!=="NA";
-  const giovane = inp.p4.giovane && !giovaneFuoriEta;
-  const donna = inp.genere === "F";
+  // Giovane: meno di 41 anni alla DdS (riferimento prudenziale: scadenza del 22/10/2026);
+  // per le società conta la compagine sociale (vedi statoSoggetto).
+  const sog = statoSoggetto();
+  const eta = sog.eta;
+  const giovaneFuoriEta = sog.fuoriEta;
+  const giovane = sog.giovane;
+  const donna = sog.donna;
 
   // ================= FASE 4 — ANALISI TECNICA VOCI =================
   const analisi = voci.map(v => {
@@ -909,7 +1029,8 @@ function calcola(vociParam){
     aliquota = costoTot > 0 ? contributo / costoTot * 100 : 0;
   }
   const aliquoteUsate = [...new Set(ammesse.map(a=>a.aliquota))];
-  if (giovane) aliquotaNota = "Giovane agricoltore dichiarato: 80% su investimenti e spese generali, da confermare con la documentazione della qualifica (sezione Giovane Agricoltore del fascicolo o requisiti di età e insediamento).";
+  if (giovane && sog.societa) aliquotaNota = "Società con requisito giovane ("+sog.compagineNota+"): 80% su investimenti e spese generali, da confermare con visura e atti societari.";
+  else if (giovane) aliquotaNota = "Giovane agricoltore dichiarato: 80% su investimenti e spese generali, da confermare con la documentazione della qualifica (sezione Giovane Agricoltore del fascicolo o requisiti di età e insediamento).";
   else if (daVoci) aliquotaNota = "Aliquota per voce (DAdG 49/2026): 65% per gli investimenti fissi localizzati in zone montane o con svantaggi naturali e per i beni mobili con oltre il 50% della SAU in tali zone ("+PCT(inp.satSvantaggiata)+" da fascicolo), altrimenti 60%. Spese generali: aliquota dell'investimento economicamente prevalente della linea."+(aliquoteUsate.length>1?" Aliquota media risultante "+PCT(aliquota)+".":"");
   else aliquotaNota = "Voci di spesa non dettagliate: aliquota stimata sulla SAU aziendale ("+PCT(inp.satSvantaggiata)+" in zone montane/svantaggiate).";
   if (giovaneFuoriEta) aliquotaNota += " ⚠ Giovane dichiarato ma con "+eta+" anni alla scadenza della DdS: aliquota 80% non applicata.";
@@ -978,7 +1099,8 @@ function calcola(vociParam){
 
   // ---- P4 ----
   let p4=0; const p4det=[];
-  if (giovane || donna) { p4+=10; p4det.push((giovane?"Giovane agricoltore dichiarato":"Titolare donna")+" (10 pt)"); }
+  if (giovane || donna) { p4+=10; p4det.push((sog.societa ? "Società con compagine "+[giovane?"giovane":null, donna?"femminile":null].filter(Boolean).join(" e ")+" ("+sog.compagineNota+")" : (giovane?"Giovane agricoltore dichiarato":"Titolare donna"))+" (10 pt)"); }
+  else if (sog.societa) p4det.push("Criterio 4.1 non attribuito: "+sog.nota.trim());
   else if (giovaneFuoriEta) p4det.push("⚠ Giovane dichiarato ma "+eta+" anni alla scadenza DdS (22/10/2026): criterio 4.1 non attribuito");
   if (inp.p4.cdiap){ p4+=10; p4det.push("Qualifica CD/IAP (10 pt)"); }
   if (inp.p4.dop){ p4+=5; p4det.push("DOP/IGP/Prodotti di Puglia (5 pt)"); }
@@ -1092,8 +1214,8 @@ function calcola(vociParam){
   <table class="r">
     <tr><th style="width:25%">Ditta</th><td>${esc(inp.ditta)||"—"}</td><th style="width:15%">CUAA</th><td>${esc(inp.cuaa)||"—"}</td></tr>
     <tr><th>Soggettività</th><td>${({IA:"Imprenditore Agricolo (art. 2135 c.c.)",OP:"Organizzazione di Produttori",COOP:"Cooperativa agricola",RETE:"Rete di Imprese",ALTRO:"Altro"})[inp.soggettivita]}</td><th>Sede</th><td>${esc(inp.comune)||"—"}</td></tr>
-    <tr><th>Titolare</th><td>${inp.genere==="F"?"Donna":inp.genere==="M"?"Uomo":"Società"}${nascitaFmt?" · nascita "+nascitaFmt:""}</td>
-        <th>Giovane Agricoltore</th><td>${giovane===true?"<b>SÌ</b> dichiarato, da verificare":"No dichiarato"}</td></tr>
+    <tr><th>${sog.societa?"Rappresentante legale":"Titolare"}</th><td>${sog.societa ? (esc(sog.rl.nome)||"—")+(sog.rl.genere?" · "+(sog.rl.genere==="F"?"donna":"uomo"):"")+(eta!=null?" · "+eta+" anni al 22/10/2026":"") : (inp.genere==="F"?"Donna":"Uomo")+(nascitaFmt?" · nascita "+nascitaFmt:"")}</td>
+        <th>Giovane / Donna (4.1)</th><td>${sog.societa ? "Giovane: <b>"+(giovane?"SÌ":"no")+"</b> · Donna: <b>"+(donna?"SÌ":"no")+"</b><br><small>"+esc(sog.compagineNota||"compagine non indicata")+"</small>" : (giovane===true?"<b>SÌ</b> dichiarato, da verificare":"No dichiarato")}</td></tr>
   </table>
 
   <div class="esito ${esitoCls}"><span class="badge">${esitoCls==="ok"?"✅":esitoCls==="ko"?"⛔":"⚠️"}</span>
@@ -1359,10 +1481,9 @@ function estraiFascicoloAgea(testoRaw){
       if (candidate) out.campi.ditta = candidate;
     }
   }
-  if (!out.campi.ditta) {
-    const tit = testo.match(/Titolare o Rappresentante legale:\s*[A-Z0-9]+\s*-\s*([A-ZÀ-Ý' ]+)/i);
-    if (tit) out.campi.ditta = tit[1].trim();
-  }
+  // Titolare o rappresentante legale: "CODICEFISCALE - COGNOME NOME"
+  const tit = testo.match(/Titolare o Rappresentante legale:\s*([A-Z0-9]{16})\s*-\s*([A-ZÀ-Ý'’ ]+)/i);
+  if (!out.campi.ditta && tit) out.campi.ditta = tit[2].trim();
 
   const nascita = testo.match(/(\d{2}\/\d{2}\/\d{4})\s+([A-ZÀ-Ý' ]+)\s*\nForma giuridica/i);
   if (nascita) out.campi.nascita = dataIsoIT(nascita[1]);
@@ -1381,12 +1502,22 @@ function estraiFascicoloAgea(testoRaw){
   if (forma) {
     const fg = forma[1].toUpperCase();
     if (/DITTA INDIVIDUALE|IMPRESA INDIVIDUALE/.test(fg)) out.campi.soggettivita = "IA";
-    else if (/COOPERATIVA/.test(fg)) { out.campi.soggettivita = "COOP"; out.campi.genere = "NA"; }
+    else if (/COOPERATIVA/.test(fg)) { out.campi.soggettivita = "COOP"; out.campi.genere = "NA"; out.campi.tipoSoc = "COOP"; }
     else if (/SOCIETA/.test(fg) && /SOCIETA'?\s+AGRICOLA|SOC\.?\s*AGR/i.test(out.campi.ditta||"")) {
       out.campi.soggettivita = "IA"; out.campi.genere = "NA";
       out.note.push("Società agricola ("+forma[1].trim()+"): trattata come imprenditore agricolo. Giovane/donna (criterio 4.1 e aliquota 80%) vanno verificati sulla compagine sociale.");
     }
     else { if (/SOCIETA/.test(fg)) out.campi.genere = "NA"; out.note.push("Forma giuridica rilevata: "+forma[1].trim()+" (verificare soggettività)."); }
+    if (out.campi.genere === "NA" && !out.campi.tipoSoc)
+      out.campi.tipoSoc = /RESPONSABILITA|PER AZIONI|ACCOMANDITA PER AZIONI|CONSORTILE/.test(fg) ? "CAP" : "PERS";
+  }
+  // Società: dati del rappresentante legale (genere e nascita dal codice fiscale)
+  if (out.campi.genere === "NA" && tit){
+    out.campi.rlCf = tit[1].toUpperCase();
+    out.campi.rlNome = tit[2].trim();
+    const info = infoDaCf(tit[1]);
+    if (info){ out.campi.rlGenere = info.genere; out.campi.nascita = info.nascita; }
+    out.note.push("Rappresentante legale: "+out.campi.rlNome+(info?" ("+(info.genere==="F"?"donna":"uomo")+", "+etaAl(info.nascita, DATA_RIF_DDS)+" anni al 22/10/2026)":"")+". Per il criterio 4.1 e l'aliquota 80% indica la compagine sociale nella sezione 1 (dati dalla visura camerale).");
   }
 
   // Tabella della Produzione Standard: delimitata tra l'intestazione OTE/PS e l'inizio
@@ -1638,13 +1769,14 @@ async function importaFascicolo(file){
   }
   // 4) Riconoscimento campi
   const dati = estraiFascicoloAgea(testo);
+  ["rlNome","rlCf","rlGenere","socTot","socGiovani","socDonne"].forEach(id => { const el = document.getElementById(id); if (el) el.value = ""; });
+  ["capGiovani","capDonne","p4_giovane"].forEach(id => { const el = document.getElementById(id); if (el) el.checked = false; });
   const compilati = applicaDatiFascicolo(dati);
   // particelle catastali disponibili per la selezione nelle voci di spesa
   particelleFascicolo = dati.particelle || [];
   renderVoci();
   p3AutoSeAttivo();
-  aggiornaAliquotaPreview();
-  aggiornaEta();
+  aggiornaSoggetto();
   if (!compilati) {
     const note = dati.note.length ? "\n\nNote:\n- "+dati.note.join("\n- ") : "";
     setImportStatus(
@@ -1663,10 +1795,9 @@ async function importaFascicolo(file){
 function aggiornaAliquotaPreview(){
   const el = document.getElementById("aliquotaPreview");
   if (!el) return;
-  const eta = etaAl(val("nascita"), DATA_RIF_DDS);
-  const giovane = chk("p4_giovane") && !(eta!=null && eta >= 41 && val("genere")!=="NA");
+  const sog = statoSoggetto();
   const sat = parseFloat((document.getElementById("satSvantaggiata")||{}).value) || 0;
-  if (giovane) el.textContent = "Aliquota di sostegno stimata: 80% su tutto (giovane agricoltore dichiarato) — orientativa, da confermare";
+  if (sog.giovane) el.textContent = "Aliquota di sostegno stimata: 80% su tutto ("+(sog.societa ? "società con compagine giovane" : "giovane agricoltore dichiarato")+") — orientativa, da confermare";
   else el.textContent = "Aliquota stimata: beni mobili " + (sat > 50 ? "65%" : "60%") + " (SAU in zone montane/svantaggiate " + PCT(sat) + "); investimenti fissi 65% se le particelle selezionate ricadono in tali zone, altrimenti 60% — orientativa";
 }
 
@@ -1703,8 +1834,7 @@ async function apriPratica(file){
   vociState = (d.voci || []).map(v => { const n = { ...nuovaVoce(), ...v }; if (v.zonaAgricola!=null && v.urbanistica==null) n.urbanistica = v.zonaAgricola; return n; });
   particelleFascicolo = d.particelle || [];
   renderVoci();
-  aggiornaAliquotaPreview();
-  aggiornaEta();
+  aggiornaSoggetto();
   document.getElementById("report").classList.remove("visible");
   setImportStatus("Pratica caricata: "+(val("ditta")||file.name)+(d.salvato?" (salvata il "+new Date(d.salvato).toLocaleString("it-IT")+")":"")+". "+vociState.length+" voci di spesa, "+particelleFascicolo.length+" particelle.", "ok");
 }
@@ -1719,8 +1849,7 @@ async function apriPratica(file){
 })();
 
 renderVoci();
-aggiornaAliquotaPreview();
-aggiornaEta();
+aggiornaSoggetto();
 </script>
 </body>
 </html>

@@ -33,6 +33,7 @@ Tutto il calcolo avviene nel browser: nessun dato viene inviato a server esterni
 - Zone svantaggiate (criterio 3.7 e aliquota 65%): comprendono sia le zone montane sia quelle con svantaggi naturali (DAdG 49/2026).
 - P1 è calcolato sugli investimenti escluse le spese generali; CR27, CR28, P5 e il criterio 8.2.b (≤ 50.000 €) sulla spesa complessiva comprese le spese generali.
 - La qualifica di Giovane Agricoltore è acquisita come dichiarazione preliminare e va verificata con la documentazione in fase di incarico.
+- **Società:** il rappresentante legale (nome, codice fiscale, genere ed età) è letto dal fascicolo, ma per il criterio 4.1 e l'aliquota 80% conta la compagine sociale: società di persone almeno 2/3 dei soci (accomandatari nelle s.a.s.) giovani o donne; società di capitali oltre il 50% del capitale e maggioranza degli amministratori (DAdG 49/2026, FAQ 06/08/2026).
 - Se un dato di input è assente (es. OTE per il P5), il principio è marcato "N.D." ed escluso dal calcolo.
 
 La scheda ha valore preliminare e orientativo: non costituisce asseverazione, Domanda di Sostegno, garanzia di ammissibilità o garanzia di finanziamento. L'esito definitivo resta di competenza dell'istruttoria dell'Autorità di Gestione.
