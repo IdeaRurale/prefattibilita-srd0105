@@ -155,10 +155,10 @@
       <input type="text" id="cuaa" placeholder="16 caratteri" maxlength="16">
     </label>
     <label class="f">Soggettività giuridica
-      <select id="soggettivita">
+      <select id="soggettivita" onchange="aggiornaSoggetto()">
         <option value="IA">Imprenditore Agricolo (art. 2135 c.c.)</option>
         <option value="OP">Organizzazione di Produttori (OP)</option>
-        <option value="COOP">Cooperativa agricola</option>
+        <option value="COOP">Cooperativa agricola (conduzione da verificare)</option>
         <option value="RETE">Rete di Imprese</option>
         <option value="ALTRO">Altro soggetto (non ammissibile)</option>
       </select>
@@ -224,6 +224,50 @@
       <div class="chk"><input type="checkbox" id="capDonne" onchange="aggiornaSoggetto()"><span>Oltre il 50% del capitale sottoscritto da <b>donne</b> <b>e</b> maggioranza degli amministratori donne</span></div>
     </div>
     <p class="hint" id="socEsito" style="margin-top:6px"></p>
+  </div>
+  <div id="coopConduzioneBox" class="part-box" style="display:none">
+    <div class="part-title">CR01 · Cooperativa agricola di conduzione</div>
+    <label class="f">Verifica della conduzione (statuto/visura e attività effettiva)
+      <select id="coopConduzione">
+        <option value="">Non documentata — NON VERIFICABILE</option>
+        <option value="DICHIARATA">Dichiarata, documenti da controllare — DA VERIFICARE</option>
+        <option value="VERIFICATA">Cooperativa di conduzione verificata — CONFORME</option>
+        <option value="NON_CONDUZIONE">Non è cooperativa di conduzione — esito secondo il percorso dichiarato</option>
+        <option value="DUBBIA">Documenti ambigui — VALUTAZIONE AGRONOMO</option>
+      </select>
+      <small>La dicitura «cooperativa» nel fascicolo non prova la conduzione.</small>
+    </label>
+  </div>
+  <div id="doc03Box" class="part-box" style="display:none">
+    <div class="part-title">DOC03 · Atti societari (ove necessario)</div>
+    <div class="grid">
+      <label class="f">La normativa e la forma societaria richiedono gli atti DOC03?
+        <select id="doc03Necessita">
+          <option value="">Da verificare</option>
+          <option value="RICHIESTO">Sì, atti richiesti</option>
+          <option value="NON_RICHIESTO">No, non dovuti (motivare sotto)</option>
+          <option value="DUBBIA">Caso dubbio — valutazione agronomo</option>
+        </select>
+      </label>
+      <label class="f">Se richiesti, gli atti pertinenti sono stati verificati?
+        <select id="doc03Documenti">
+          <option value="">Non verificati o non disponibili</option>
+          <option value="VERIFICATI">Sì, atti pertinenti verificati</option>
+          <option value="MANCANTI">No, atti dovuti mancanti</option>
+        </select>
+      </label>
+      <label class="f">Motivo se gli atti non sono dovuti
+        <input type="text" id="doc03Motivo" placeholder="Forma, norma e atti esaminati">
+      </label>
+    </div>
+    <label class="f" id="doc03RegolamentoBox" style="display:none">Rete d'impresa: Regolamento Interno sui rapporti fra partner e sull'uso dei beni finanziati
+      <select id="doc03Regolamento">
+        <option value="">Non verificato o non disponibile</option>
+        <option value="VERIFICATO">Presente e verificato</option>
+        <option value="MANCANTE">Mancante</option>
+      </select>
+    </label>
+    <p class="hint">Verificare atto costitutivo, statuto e verbale dell'organo deliberante o dichiarazione dei soggetti con poteri decisionali secondo quanto effettivamente previsto.</p>
   </div>
 </fieldset>
 
@@ -884,10 +928,16 @@ function statoSoggetto(){
     nota += " Il rappresentante legale è "+[rlGiovane && !giovane ? "giovane" : null, rlDonna && !donna ? "donna" : null].filter(Boolean).join(" e ")+", ma da solo non basta: conta la compagine sociale.";
   return { societa:true, tipo, giovane, donna, eta, fuoriEta:false, nota, compagineNota, rl };
 }
+function eCooperativa(soggettivita, genere, tipoSoc){
+  return soggettivita==="COOP" || (soggettivita==="IA" && genere==="NA" && tipoSoc==="COOP");
+}
 function aggiornaSoggetto(){
   const soc = val("genere") === "NA";
   const box = document.getElementById("boxSocieta"); if (!box) return;
   box.style.display = soc ? "" : "none";
+  document.getElementById("coopConduzioneBox").style.display = eCooperativa(val("soggettivita"), val("genere"), val("tipoSoc")) ? "" : "none";
+  document.getElementById("doc03Box").style.display = soc || ["OP","COOP","RETE"].includes(val("soggettivita")) ? "" : "none";
+  document.getElementById("doc03RegolamentoBox").style.display = val("soggettivita")==="RETE" ? "" : "none";
   const pers = val("tipoSoc") === "PERS";
   document.getElementById("socPersone").style.display = pers ? "" : "none";
   document.getElementById("socCapitali").style.display = pers ? "none" : "";
@@ -900,6 +950,9 @@ function aggiornaSoggetto(){
   aggiornaEta();
   aggiornaAliquotaPreview();
 }
+function azzeraVerificheCr01Doc03(){
+  ["coopConduzione","doc03Necessita","doc03Documenti","doc03Motivo","doc03Regolamento"].forEach(id => { document.getElementById(id).value = ""; });
+}
 
 function calcola(vociParam){
   const voci = Array.isArray(vociParam) ? vociParam : vociState;
@@ -908,8 +961,9 @@ function calcola(vociParam){
 
   const inp = {
     ditta: val("ditta"), cuaa: val("cuaa").toUpperCase(), comune: val("comune"),
-    soggettivita: val("soggettivita"), soloSilvAcqua: chk("soloSilvAcqua"), affitto: chk("affitto"), comodato: chk("comodato"),
-    nascita: val("nascita"), genere: val("genere"),
+    soggettivita: val("soggettivita"), coopConduzione: val("coopConduzione"), soloSilvAcqua: chk("soloSilvAcqua"), affitto: chk("affitto"), comodato: chk("comodato"),
+    nascita: val("nascita"), genere: val("genere"), tipoSoc: val("tipoSoc"),
+    doc03Necessita: val("doc03Necessita"), doc03Documenti: val("doc03Documenti"), doc03Motivo: val("doc03Motivo"), doc03Regolamento: val("doc03Regolamento"),
     psTotale: num("psTotale"), psOlio: num("psOlio"), ote: num("ote"),
     costoTotManuale: num("costoTot"), speseGenManuale: num("speseGenManuale"), giaAmmesso: num("giaAmmesso") ?? 0,
     soloOlivicolo: chk("soloOlivicolo"),
@@ -963,11 +1017,22 @@ function calcola(vociParam){
 
   // ================= FASE 1 — KILLER CRITERIA =================
   const kc = [];
-  let cr01ok, cr01note;
-  if (inp.soggettivita === "ALTRO") { cr01ok=false; cr01note="Soggetto diverso da Imprenditore Agricolo / OP / Cooperativa / Rete di Imprese."; }
-  else if (inp.soloSilvAcqua) { cr01ok=false; cr01note="Attività esclusiva di silvicoltura/acquacoltura: esclusa."; }
-  else { cr01ok=true; cr01note="Soggetto ammissibile ("+({IA:"Imprenditore Agricolo art. 2135",OP:"Organizzazione di Produttori",COOP:"Cooperativa agricola",RETE:"Rete di Imprese"})[inp.soggettivita]+")."; }
-  kc.push({cod:"CR01", nome:"Soggettività", ok:cr01ok, nota:cr01note});
+  // DAdG 49/2026, Avviso BURP 62 p. 20; FAQ 06/08/2026 p. 3: solo cooperative agricole di conduzione.
+  let cr01stato, cr01note;
+  if (inp.soggettivita === "ALTRO") { cr01stato="NON CONFORME"; cr01note="Soggetto diverso da Imprenditore Agricolo / OP / Cooperativa di conduzione / Rete di Imprese."; }
+  else if (inp.soloSilvAcqua) { cr01stato="NON CONFORME"; cr01note="Attività esclusiva di silvicoltura/acquacoltura: esclusa."; }
+  else if (eCooperativa(inp.soggettivita, inp.genere, inp.tipoSoc)) {
+    const stati = {
+      DICHIARATA:["DA VERIFICARE","Conduzione dichiarata: controllare statuto/visura e attività effettiva."],
+      VERIFICATA:["CONFORME","Cooperativa agricola di conduzione verificata sui documenti."],
+      NON_CONDUZIONE:inp.soggettivita==="IA"
+        ? ["VALUTAZIONE AGRONOMO","Cooperativa non di conduzione: valutare se possa presentare domanda come imprenditore agricolo singolo."]
+        : ["NON CONFORME","Cooperativa non di conduzione: non rientra tra i soggetti associati previsti."],
+      DUBBIA:["VALUTAZIONE AGRONOMO","Documenti sulla conduzione ambigui: serve valutazione dell'agronomo."]
+    };
+    [cr01stato, cr01note] = stati[inp.coopConduzione] || ["NON VERIFICABILE","Forma cooperativa rilevata, ma la conduzione non è documentata; il fascicolo non basta a provarla."];
+  } else { cr01stato="CONFORME"; cr01note="Soggetto dichiarato ("+({IA:"Imprenditore Agricolo art. 2135",OP:"Organizzazione di Produttori",RETE:"Rete di Imprese"})[inp.soggettivita]+")."; }
+  kc.push({cod:"CR01", nome:"Soggettività", stato:cr01stato, ok:cr01stato==="CONFORME" ? true : cr01stato==="NON CONFORME" ? false : null, nota:cr01note});
 
   let cr02ok=null, cr02note;
   if (inp.psTotale==null && !(inp.soloOlivicolo && inp.psOlio!=null)) { cr02note="DATO MANCANTE: Produzione Standard totale."; }
@@ -1147,7 +1212,7 @@ function calcola(vociParam){
   const DOCDESCR = {
     DOC01:"Documento di identità del titolare/legale rappresentante",
     DOC02:"Autorizzazione del proprietario/comproprietario all'investimento e garanzia di rinnovo del titolo per l'intero periodo di impegno",
-    DOC03:"Atto costitutivo/statuto o atto deliberativo per società, soggetti collettivi e reti d'impresa",
+    DOC03:"Ove necessario: atto costitutivo e statuto; verbale dell'organo deliberante ove previsto o dichiarazione dei soggetti con poteri decisionali, secondo gli atti effettivamente richiesti per la forma societaria",
     DOC04:"Concessione/autorizzazione all'emungimento (pozzo), prelievo consortile o consenso all'uso di acque reflue",
     DOC05:"Relazione Tecnica di progetto",
     DOC06:"Elaborati grafici con ubicazione puntuale degli interventi",
@@ -1173,13 +1238,35 @@ function calcola(vociParam){
   };
   const docSet = new Set(["DOC01","DOC05","DOC07","DOC11","DOC20","DOC21","DOC22"]);
   if (inp.affitto) docSet.add("DOC02");
-  if (["OP","COOP","RETE"].includes(inp.soggettivita)) docSet.add("DOC03");
+  // DAdG 49/2026, Avviso BURP 62 p. 35, Tabella 9: DOC03 per forma societaria, ove necessario.
+  const formaSocietaria = inp.genere==="NA" || inp.soggettivita==="COOP";
+  if (formaSocietaria || ["OP","RETE"].includes(inp.soggettivita)) docSet.add("DOC03");
   if (inp.p4.cdiap && inp.genere==="NA") docSet.add("DOC23");
   if (inp.p4.coop) docSet.add("DOC15");
   if (inp.p4.rlaq) docSet.add("DOC25");
   if (p8fin>0 && !(costoTot!=null && costoTot<=50000)) docSet.add("DOC19");
   analisi.filter(a=>a.amm).forEach(a => a.docs.forEach(d => docSet.add(d)));
-  const docList = [...docSet].sort().map(c=>({cod:c, desc:DOCDESCR[c]}));
+  const docList = [...docSet].sort().map(c=>{
+    if (c!=="DOC03") return {cod:c, desc:DOCDESCR[c]};
+    let stato, nota;
+    if (!formaSocietaria && !inp.doc03Necessita) { stato="NON VERIFICABILE"; nota="Forma societaria non accertata: verificare se DOC03 si applica."; }
+    else if (inp.doc03Necessita==="DUBBIA") { stato="VALUTAZIONE AGRONOMO"; nota="Applicabilità degli atti da valutare."; }
+    else if (inp.doc03Necessita==="NON_RICHIESTO") {
+      stato=inp.doc03Motivo.trim() ? "CONFORME" : "DA VERIFICARE";
+      nota=inp.doc03Motivo.trim() ? "Atti non dovuti secondo la verifica motivata: "+inp.doc03Motivo.trim() : "Motivare perché gli atti non sono dovuti.";
+    } else if (inp.doc03Necessita==="RICHIESTO") {
+      stato=inp.doc03Documenti==="VERIFICATI" ? "CONFORME" : inp.doc03Documenti==="MANCANTI" ? "NON CONFORME" : "NON VERIFICABILE";
+      nota=stato==="CONFORME" ? "Atti pertinenti dichiarati verificati." : stato==="NON CONFORME" ? "Atti dovuti dichiarati mancanti." : "Atti dovuti non ancora verificati o disponibili.";
+    } else { stato="DA VERIFICARE"; nota="Determinare quali atti sono effettivamente previsti dalla forma societaria e dalla normativa vigente."; }
+    let desc = DOCDESCR[c];
+    // DAdG 49/2026, Avviso BURP 62 p. 37: per la Rete va prodotto anche il Regolamento Interno.
+    if (inp.soggettivita==="RETE") {
+      desc += "; per le Reti d'impresa anche il Regolamento Interno sui rapporti fra partner e sull'uso delle strutture e dei beni finanziati";
+      if (inp.doc03Regolamento==="MANCANTE") { stato="NON CONFORME"; nota+=" Regolamento Interno mancante."; }
+      else if (inp.doc03Regolamento!=="VERIFICATO" && stato==="CONFORME") { stato="NON VERIFICABILE"; nota+=" Regolamento Interno non verificato o non disponibile."; }
+    }
+    return {cod:c, desc, stato, nota};
+  });
   const richiedeSIAN = docSet.has("DOC12");
 
   // documentazione di profilo (a supporto del punteggio, senza codice Tabella 9)
@@ -1225,7 +1312,7 @@ function calcola(vociParam){
   <table class="r">
     <tr><th style="width:8%">Cod.</th><th style="width:26%">Requisito</th><th style="width:10%">Esito</th><th>Dettaglio</th></tr>
     ${kc.map(k=>`<tr><td><b>${k.cod}</b></td><td>${k.nome}</td>
-      <td class="${k.ok===true?"pass-row":k.ok===false?"fail-row":"miss"}">${k.ok===true?"✔ OK":k.ok===false?"✘ KO":"⚠ N.D."}</td>
+      <td class="${k.ok===true?"pass-row":k.ok===false?"fail-row":"miss"}">${k.stato || (k.ok===true?"✔ OK":k.ok===false?"✘ KO":"⚠ N.D.")}</td>
       <td>${k.nota}</td></tr>`).join("")}
   </table>`;
 
@@ -1281,7 +1368,7 @@ function calcola(vociParam){
   h += `
   <h3 class="r">Check-list documentale (Tabella 9, in base al profilo)</h3>
   <ul class="docs">
-    ${docList.map(d=>`<li><b>${d.cod}</b> ${d.desc}</li>`).join("")}
+    ${docList.map(d=>`<li><b>${d.cod}</b> ${d.desc}${d.stato ? " — <b>"+d.stato+"</b>. "+esc(d.nota) : ""}</li>`).join("")}
   </ul>`;
 
   if (richiedeSIAN) h += `
@@ -1769,6 +1856,7 @@ async function importaFascicolo(file){
   }
   // 4) Riconoscimento campi
   const dati = estraiFascicoloAgea(testo);
+  azzeraVerificheCr01Doc03(); // Il fascicolo riconosce la forma, non prova conduzione né atti DOC03 dovuti.
   ["rlNome","rlCf","rlGenere","socTot","socGiovani","socDonne"].forEach(id => { const el = document.getElementById(id); if (el) el.value = ""; });
   ["capGiovani","capDonne","p4_giovane"].forEach(id => { const el = document.getElementById(id); if (el) el.checked = false; });
   const compilati = applicaDatiFascicolo(dati);
@@ -1808,7 +1896,7 @@ function statoPratica(){
     if (el.type === "file") return;
     campi[el.id] = el.type === "checkbox" ? el.checked : el.value;
   });
-  return { app:"prefattibilita-srd0105", versione:2, salvato:new Date().toISOString(), campi, voci:vociState, particelle:particelleFascicolo };
+  return { app:"prefattibilita-srd0105", versione:4, salvato:new Date().toISOString(), campi, voci:vociState, particelle:particelleFascicolo };
 }
 function salvaPratica(){
   const blob = new Blob([JSON.stringify(statoPratica(), null, 2)], { type:"application/json" });
@@ -1825,6 +1913,8 @@ async function apriPratica(file){
   try { d = JSON.parse(await file.text()); }
   catch (err) { setImportStatus("Il file selezionato non è una pratica salvata valida (JSON non leggibile).", "err"); return; }
   if (!d || !d.campi) { setImportStatus("Il file selezionato non contiene una pratica di questa app.", "err"); return; }
+  // I controlli assenti nei JSON precedenti non devono ereditare valori da un'altra pratica.
+  azzeraVerificheCr01Doc03();
   for (const [id, v] of Object.entries(d.campi)){
     const el = document.getElementById(id);
     if (!el || el.type === "file") continue;
@@ -1836,7 +1926,13 @@ async function apriPratica(file){
   renderVoci();
   aggiornaSoggetto();
   document.getElementById("report").classList.remove("visible");
-  setImportStatus("Pratica caricata: "+(val("ditta")||file.name)+(d.salvato?" (salvata il "+new Date(d.salvato).toLocaleString("it-IT")+")":"")+". "+vociState.length+" voci di spesa, "+particelleFascicolo.length+" particelle.", "ok");
+  const avvisi = [];
+  if ((d.versione||0)<=2 && val("soggettivita")==="COOP" && !val("coopConduzione") && !chk("soloSilvAcqua")) avvisi.push("CR01: un precedente esito positivo basato sulla sola dicitura COOP cambia in NON VERIFICABILE; serve verificare la conduzione.");
+  if ((d.versione||0)<=3 && val("soggettivita")==="IA" && eCooperativa(val("soggettivita"),val("genere"),val("tipoSoc")) && !val("coopConduzione") && !chk("soloSilvAcqua")) avvisi.push("CR01: la cooperativa classificata IA non è più automaticamente CONFORME; senza verifica della conduzione l'esito è NON VERIFICABILE.");
+  if ((d.versione||0)<=2 && (val("genere")==="NA" || ["OP","COOP","RETE"].includes(val("soggettivita")))) avvisi.push("DOC03: ora è richiesta una verifica condizionata «ove necessario» degli atti effettivamente dovuti; per le società IA la checklist precedente poteva ometterlo.");
+  if ((d.versione||0)<=3 && val("soggettivita")==="RETE" && !val("doc03Regolamento")) avvisi.push("DOC03: per la Rete il Regolamento Interno è richiesto e non risulta verificato; l'esito precedente va rivalutato con questo controllo aggiuntivo.");
+  const messaggio="Pratica caricata: "+(val("ditta")||file.name)+(d.salvato?" (salvata il "+new Date(d.salvato).toLocaleString("it-IT")+")":"")+". "+vociState.length+" voci di spesa, "+particelleFascicolo.length+" particelle.";
+  setImportStatus(messaggio+(avvisi.length?"\n\nRivalutazione conservativa JSON precedente:\n- "+avvisi.join("\n- "):""), avvisi.length?"warn":"ok");
 }
 
 // Giorni mancanti alla scadenza della DdS
