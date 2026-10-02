@@ -23,11 +23,15 @@ Tutto il calcolo avviene nel browser: nessun dato viene inviato a server esterni
   - **Impianti arborei:** esclusione di rinfittimenti/ripristino fallanze; specie già finanziate in precedenti Avvisi SRD01 non prioritarie; valorizzazione a Costi Standard (Metodologia UCS Impianti Arborei — RRN).
   - **Impianti arborei:** olivo, ciliegio, uva da tavola e agrumi riconosciuti in automatico come specie già finanziate (non prioritarie, FAQ 06/08/2026).
   - **Opere edili:** ammissibili se consentite dagli strumenti urbanistici vigenti, con destinazione produttiva; computo metrico sul Prezzario regionale OOPP Puglia edizione 2026 (DGR 774/2026).
-  - **Investimenti irrigui:** prioritari se nuovi impianti con efficienza ≥ 85% (≥ 80% con sole acque reflue); concessione/prelievo consortile/consenso reflue come condizione di ammissibilità; obbligo misuratori.
+  - **Investimenti irrigui — M2.1:** registra la classificazione dichiarata dell'intervento e il metodo proposto dell'Allegato 5. L'indice ufficiale deriva esclusivamente dal codice 12–17; la stima percentuale libera resta un dato dichiarato senza valore normativo automatico. Ammissibilità, titoli, CR21 e P1 irrigui restano `NON VERIFICABILE` fino alle milestone successive e alla verifica tecnica.
   - **Esclusioni DAdG 49 / FAQ:** mezzi di trasporto e movimento terra (anche dalla descrizione), cisterne alimentate solo da acque meteoriche, rinnovabili non in esclusivo autoconsumo o sovradimensionate rispetto al fabbisogno.
 - **Check-list documentale (Tabella 9)** generata in base al profilo e alle voci di spesa: sempre DOC01, DOC05, DOC07, DOC11, DOC20, DOC21, DOC22; DOC02 per immobili non in proprietà con titolo idoneo; DOC03 per soggetti collettivi/società; DOC08/09/10 per edilizia; DOC12 per beni fuori prezzario; DOC13 per beni unici; DOC14 per rinnovabili; DOC19 per sostenibilità finanziaria; DOC04 per investimenti irrigui. Con avviso sull'obbligo di gestione dematerializzata dei preventivi tramite portale SIAN.
 - **DOC03 (ove necessario):** compare anche per le società agricole classificate IA. Per OP e Reti le verifiche compilate producono l'esito documentale. La verifica registra se gli atti sono effettivamente dovuti e, se sì, se sono stati controllati; se non dovuti, richiede una motivazione. Per le Reti si controlla separatamente il Regolamento Interno, senza presumere che sia presente. Riferimenti: DAdG 49/2026, Avviso BURP 62, p. 35, Tabella 9, e p. 37.
-- **Pratiche JSON:** i file versione 2 e 3 restano leggibili e non sono riscritti all'apertura. I controlli assenti nel file partono vuoti; l'app avvisa quando CR01 o DOC03 richiedono una rivalutazione. I nuovi salvataggi sono versione 4.
+- **Pratiche JSON:** i file versione 2, 3 e 4 restano leggibili e non sono riscritti all'apertura. I nuovi dati irrigui mancanti restano ignoti: le vecchie percentuali e caselle non diventano automaticamente metodi, titoli o verifiche normative. L'app avvisa quando i dati irrigui, CR01 o DOC03 richiedono una rivalutazione. I nuovi salvataggi sono versione 5.
+
+## Test automatici
+
+Dal repository: `node --test tests/*.test.cjs` (Milestone 1 CR01/DOC03 e fondamenta irrigue M2.1).
 
 ## Note metodologiche
 

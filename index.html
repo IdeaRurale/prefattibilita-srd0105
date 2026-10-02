@@ -303,7 +303,7 @@
 <!-- ====== VOCI DI SPESA / ANALISI TECNICA ====== -->
 <fieldset>
   <legend>3 · Voci di spesa — Analisi tecnica dell'investimento</legend>
-  <p class="hint">Inserisci ogni voce di spesa del preventivo. Per ciascuna categoria l'app applica le regole di validazione (requisito 4.0, esclusione rinfittimenti, conformità urbanistica, soglie di efficienza irrigua, mezzi di trasporto esclusi), determina se la voce è <b>prioritaria</b> ai fini del P1, l'aliquota di sostegno e la documentazione giustificativa richiesta. Per gli investimenti fissi seleziona le particelle interessate: servono per aliquota e punteggio P3.</p>
+  <p class="hint">Inserisci ogni voce di spesa del preventivo. Per gli investimenti irrigui M2.1 registra classificazione e metodo dell'Allegato 5: l'indice ufficiale deriva dal codice, mentre ammissibilità e P1 restano da verificare nelle milestone successive. Per gli altri investimenti l'app applica le verifiche già disponibili. Per gli investimenti fissi seleziona le particelle interessate: servono per aliquota e punteggio P3.</p>
   <div id="vociBox"></div>
   <div class="vtot" id="vociTot"></div>
   <button type="button" class="ghost small" onclick="addVoce()">＋ Aggiungi voce di spesa</button>
@@ -438,6 +438,83 @@ const CATEGORIE = {
   SIL: "Silos / celle frigorifere",
   ALTRO: "Altra spesa"
 };
+// Allegato 5, DAdG 49/2026 consolidata, pp. PDF 64-65. I codici 01-11
+// descrivono l'ex ante; soltanto 12-17 sono selezionabili come metodo proposto.
+const METODI_IRRIGUI = Object.freeze([
+  {codice:"01", metodo:"Scorrimento e sommersione con alimentazione per gravità", sistema:"Scorrimento", indice:10},
+  {codice:"02", metodo:"Scorrimento e sommersione con sollevamento meccanico", sistema:"Scorrimento", indice:10},
+  {codice:"03", metodo:"Infiltrazione laterale a solchi", sistema:"Scorrimento", indice:10},
+  {codice:"04", metodo:"Manichetta forata ad alta pressione", sistema:"Altri sistemi irrigui", indice:20},
+  {codice:"05", metodo:"Tubazioni mobili o fisse con irrigatori ad alta pressione (>3,5 atmosfere)", sistema:"Altri sistemi irrigui", indice:40},
+  {codice:"06", metodo:"Rotolone con cannone o barra nebulizzatrice senza centralina elettronica", sistema:"Altri sistemi irrigui", indice:50},
+  {codice:"07", metodo:"Tubazioni mobili o fisse con irrigatori a bassa pressione (≤3,5 atmosfere)", sistema:"Altri sistemi irrigui", indice:60},
+  {codice:"08", metodo:"Rotolone con cannone, manometri e centralina elettronica", sistema:"Altri sistemi irrigui", indice:60},
+  {codice:"09", metodo:"Microirrigazione con coefficiente di variazione oltre soglia o età >10 anni", sistema:"Altri sistemi irrigui", indice:60},
+  {codice:"10", metodo:"Pivot/Ranger con calata senza controllo di volumi e velocità", sistema:"Altri sistemi irrigui", indice:65},
+  {codice:"11", metodo:"Spruzzatori sovrachioma (coefficiente di variazione ≤10%)", sistema:"Altri sistemi irrigui", indice:70},
+  {codice:"12", metodo:"Spruzzatori sottochioma", sistema:"Microirrigazione", indice:80, proposto:true, parametri:["coefficienteVariazione"], requisiti:"Coefficiente di variazione della portata ≤10% (dati del costruttore)"},
+  {codice:"13", metodo:"Rotolone con barra nebulizzatrice a bassa pressione", sistema:"Microirrigazione", indice:85, proposto:true, parametri:["pressione","manometroMacchina","manometriIrrigatori","controlloElettronico"], requisiti:"Pressione <3,5 atmosfere; manometri e controllo elettronico di velocità e pluviometria"},
+  {codice:"14", metodo:"Pivot/Ranger con irrigatori sopra o sotto trave", sistema:"Microirrigazione", indice:85, proposto:true, parametri:["pressione","controlloVolumi","controlloVelocita"], requisiti:"Pressione <3 bar; controllo di volumi e velocità"},
+  {codice:"15", metodo:"Pivot/Ranger con calata", sistema:"Microirrigazione", indice:90, proposto:true, parametri:["pressione","controlloVolumi","controlloVelocita"], requisiti:"Pressione <3 bar; controllo di volumi e velocità"},
+  {codice:"16", metodo:"Irrigazione a goccia", sistema:"Microirrigazione", indice:90, proposto:true, parametri:["coefficienteVariazione"], requisiti:"Coefficiente di variazione della portata ≤5% (dati del costruttore)"},
+  {codice:"17", metodo:"Ala gocciolante", sistema:"Microirrigazione", indice:90, proposto:true, parametri:["coefficienteVariazione"], requisiti:"Coefficiente di variazione della portata ≤5% (dati del costruttore)"}
+].map(m=>Object.freeze({ ...m, exAnte:true, proposto:!!m.proposto, parametri:Object.freeze(m.parametri||[]), fonte:"DAdG 49/2026 consolidata, Allegato 5, PDF pp. 64-65" })));
+const CLASSIFICAZIONI_IRRIGUE = Object.freeze({
+  NUOVO_IMPIANTO:"Nuovo impianto", AMMODERNAMENTO:"Ammodernamento",
+  COMPLETAMENTO_FUNZIONALE:"Completamento funzionale", STOCCAGGIO:"Stoccaggio",
+  SOLO_EFFICIENZA_ENERGETICA:"Sola efficienza energetica"
+});
+const PARAMETRI_IRRIGUI_FLAG = new Set(["manometroMacchina","manometriIrrigatori","controlloElettronico","controlloVolumi","controlloVelocita"]);
+function metodoIrriguo(codice, proposto=false){
+  return METODI_IRRIGUI.find(m=>m.codice===String(codice) && (!proposto || m.proposto)) || null;
+}
+function indiceMetodoIrriguo(codice, proposto=false){ return metodoIrriguo(codice, proposto)?.indice ?? null; }
+function nuovaFonteIdrica(){
+  return {id:"",tipo:"",presenteInAzienda:null,usataDaInvestimento:null,particelleServite:[],altreFontiUsate:[],
+    pozzo:{proprieta:"NON_NOTO",autorizzazionePozzo:null,autorizzazioneEmungimento:null},
+    reflue:{affinamentoDichiarato:null,provaAffinamento:null,statoProva:"PROVA_NON_ACQUISITA"}};
+}
+function nuovoTitoloIdrico(){
+  return {fonteId:"",particelleCoperte:[],tipoDocumento:"",ente:"",intestatario:"",numero:"",data:"",scadenza:"",
+    prova:null,statoVerifica:"PROVA_NON_ACQUISITA",dataRiferimentoDdS:"",
+    procedimento:{stato:"IGNOTO",oggetto:"IGNOTO",concessionePrecedente:null,provaIstanza:null,dataIstanza:"",dataConclusione:""},
+    prescrizione:{obbligoFuturo:null,termine:"",stato:"NON_VERIFICATO"}};
+}
+function nuovaTracciaRegola(){
+  return {idRegola:"",fonte:"",paginaPdf:null,datiDichiarati:null,prove:[],statoProva:"PROVA_NON_ACQUISITA",fase:"",calcolo:null,esito:"NON VERIFICABILE",giudizioAgronomo:null};
+}
+function nuovaIrrigazione(){
+  return {
+    classificazione:{dichiarata:"",confermata:"",statoVerifica:"NON VERIFICABILE"},
+    stoccaggio:{natura:"NON_NOTO",tipo:"",volume:null},
+    impiantoExAnte:{presenza:"NON_NOTO",codiceMetodo:"",indiceNormativo:null,eta:null,parametri:{},particelle:[],superficie:null,fonti:[],consumi:null,contatore:null,documenti:[],autoreValutazione:""},
+    impiantoProposto:{codiceMetodo:"",indiceNormativo:null,parametri:{coefficienteVariazione:"",pressione:"",manometroMacchina:null,manometriIrrigatori:null,controlloElettronico:null,controlloVolumi:null,controlloVelocita:null},documenti:[],stimaLibera:""},
+    fontiIdriche:[], titoliProcedimenti:[],
+    contatore:{stato:"NON_NOTO",prova:null},
+    valutazioneCR21:{applicabilita:"NON_VERIFICATA",datiExAnte:null,metodoValutazione:"",risparmioPotenziale:null,risparmioEffettivo:null,giudizioAgronomo:null},
+    p1:{qualifica:"NON VERIFICABILE",statoConsolidamento:"NON_CONSOLIDATO",percorso:"",vociBloccanti:[],baseRichiesta:null,baseAmmissibile:null,scenariInformativi:null,punteggioDefinitivo:null},
+    importi:{richiesto:null,ammissibile:null}, tracciabilita:[],
+    giudizioAgronomo:{motivazione:"",autore:"",data:""}
+  };
+}
+function normalizzaIrrigazione(raw, efficienzaLegacy=""){
+  const base=nuovaIrrigazione(), d=raw && typeof raw==="object" && !Array.isArray(raw) ? raw : {};
+  const ex=d.impiantoExAnte||{}, pr=d.impiantoProposto||{};
+  const n={ ...base, ...d,
+    classificazione:{...base.classificazione,...(d.classificazione||{})},
+    stoccaggio:{...base.stoccaggio,...(d.stoccaggio||{})},
+    impiantoExAnte:{...base.impiantoExAnte,...ex},
+    impiantoProposto:{...base.impiantoProposto,...pr,parametri:{...base.impiantoProposto.parametri,...(pr.parametri||{})}},
+    contatore:{...base.contatore,...(d.contatore||{})},
+    valutazioneCR21:{...base.valutazioneCR21,...(d.valutazioneCR21||{})},
+    p1:{...base.p1,...(d.p1||{})}, importi:{...base.importi,...(d.importi||{})},
+    giudizioAgronomo:{...base.giudizioAgronomo,...(d.giudizioAgronomo||{})}
+  };
+  if (!raw && efficienzaLegacy!=="" && efficienzaLegacy!=null) n.impiantoProposto.stimaLibera=String(efficienzaLegacy);
+  n.impiantoExAnte.indiceNormativo=indiceMetodoIrriguo(n.impiantoExAnte.codiceMetodo);
+  n.impiantoProposto.indiceNormativo=indiceMetodoIrriguo(n.impiantoProposto.codiceMetodo,true);
+  return n;
+}
 const CAR40 = [
   "Programmazione hardware/software",
   "Interconnessione remota",
@@ -517,7 +594,8 @@ function nuovaVoce(){
     car40:[false,false,false,false,false,false],
     specie:"", superficie:"", sesto:"", passaporto:false, giaFinanziata:false, rinfittimento:false,
     urbanistica:true, destProduttiva:true, tipoEd:"P4",
-    efficienza:"", nuovo:true, reflue:false, autorizzazione:false, contatori:false,
+    efficienza:"", nuovo:null, reflue:null, autorizzazione:null, contatori:null,
+    irrigazione:null,
     capacita:"", meteoriche:false, autoconsumo:true, potenzaOk:true,
     particelle:[], pozzo:false };
 }
@@ -526,7 +604,25 @@ function delVoce(i){ vociState.splice(i,1); renderVoci(); p3AutoSeAttivo(); }
 function updVoce(i, campo, v){ vociState[i][campo] = v; aggiornaTotaleVoci(); if (campo==="importo") p3AutoSeAttivo(); }
 function updVoceChk(i, campo, v){ vociState[i][campo] = v; }
 function updCar(i, j, v){ vociState[i].car40[j] = v; }
-function cambiaCat(i, v){ vociState[i].cat = v; renderVoci(); }
+function cambiaCat(i, v){ vociState[i].cat = v; if (v==="IRR") vociState[i].irrigazione=normalizzaIrrigazione(vociState[i].irrigazione,vociState[i].efficienza); renderVoci(); }
+function aggiornaClassificazioneIrrigua(i, codice){
+  const ir=vociState[i].irrigazione=normalizzaIrrigazione(vociState[i].irrigazione,vociState[i].efficienza);
+  ir.classificazione.dichiarata=Object.hasOwn(CLASSIFICAZIONI_IRRIGUE,codice)?codice:"";
+  renderVoci();
+}
+function aggiornaMetodoIrriguo(i, codice){
+  const ir=vociState[i].irrigazione=normalizzaIrrigazione(vociState[i].irrigazione,vociState[i].efficienza);
+  ir.impiantoProposto.codiceMetodo=codice;
+  ir.impiantoProposto.indiceNormativo=indiceMetodoIrriguo(codice,true);
+  renderVoci();
+}
+function aggiornaParametroIrriguo(i, campo, valore){
+  vociState[i].irrigazione.impiantoProposto.parametri[campo]=valore;
+}
+function aggiornaStimaLiberaIrrigua(i, valore){
+  vociState[i].irrigazione.impiantoProposto.stimaLibera=valore;
+  vociState[i].efficienza=valore; // Conserva il campo storico come dichiarazione, senza uso normativo.
+}
 // Somma superficie (ha) delle particelle selezionate per una voce
 function supParticelleVoce(v){
   return (v.particelle||[]).reduce((a,key)=>{ const p=particelleFascicolo.find(x=>chiaveParticella(x)===key); return a+((p&&p.supHa)||0); },0);
@@ -614,6 +710,49 @@ function aggiungiParticellaManuale(i){
   renderVoci();
 }
 
+function parametriMetodoHTML(m, parametri, i){
+  if (!m) return "";
+  const etichette={
+    coefficienteVariazione:"Coefficiente di variazione della portata (%)",
+    pressione:"Pressione di esercizio ("+(m.codice==="13"?"atmosfere":"bar")+")",
+    manometroMacchina:"Manometro sulla macchina",
+    manometriIrrigatori:"Manometri sugli irrigatori",
+    controlloElettronico:"Centralina elettronica di controllo velocità e pluviometria",
+    controlloVolumi:"Controllo dei volumi",
+    controlloVelocita:"Controllo della velocità di avanzamento"
+  };
+  return m.parametri.map(campo=>{
+    if (PARAMETRI_IRRIGUI_FLAG.has(campo)) return `<div class="chk"><input type="checkbox" ${parametri[campo]===true?"checked":""} onchange="aggiornaParametroIrriguo(${i},'${campo}',this.checked)"><span>${etichette[campo]}${parametri[campo]===null?" (da documentare)":""}</span></div>`;
+    return `<label class="f">${etichette[campo]}<input type="number" min="0" step="any" value="${esc(parametri[campo])}" oninput="aggiornaParametroIrriguo(${i},'${campo}',this.value)"></label>`;
+  }).join("");
+}
+function irrigazioneHTML(v,i){
+  const ir=v.irrigazione||nuovaIrrigazione();
+  const c=ir.classificazione.dichiarata, p=ir.impiantoProposto;
+  const m=metodoIrriguo(p.codiceMetodo,true), codiceNonProposto=p.codiceMetodo&&!m;
+  return `<div class="grid">
+    <label class="f">Classificazione dichiarata dell'investimento
+      <select onchange="aggiornaClassificazioneIrrigua(${i},this.value)">
+        <option value="" ${!c?"selected":""}>Da classificare</option>
+        ${Object.entries(CLASSIFICAZIONI_IRRIGUE).map(([k,l])=>`<option value="${k}" ${c===k?"selected":""}>${l}</option>`).join("")}
+      </select><small>La classificazione confermata richiede verifica tecnica; la scelta non la conferma automaticamente.</small>
+    </label>
+    <label class="f">Metodo irriguo proposto — Allegato 5
+      <select onchange="aggiornaMetodoIrriguo(${i},this.value)">
+        <option value="" ${!p.codiceMetodo?"selected":""}>Non identificato / non pertinente</option>
+        ${codiceNonProposto?`<option value="${esc(p.codiceMetodo)}" selected>Codice ${esc(p.codiceMetodo)} non valido come proposto</option>`:""}
+        ${METODI_IRRIGUI.filter(x=>x.proposto).map(x=>`<option value="${x.codice}" ${p.codiceMetodo===x.codice?"selected":""}>${x.codice} — ${esc(x.metodo)}</option>`).join("")}
+      </select><small>I codici 01–11 descrivono solo l'impianto ex ante. Per la sola efficienza energetica non si richiede automaticamente un nuovo metodo.</small>
+    </label>
+    <label class="f">Indice ufficiale derivato dall'Allegato 5
+      <output>${m?m.indice+"%":"Non disponibile"}</output><small>Calcolato dal codice; non è modificabile.</small>
+    </label>
+    ${parametriMetodoHTML(m,p.parametri,i)}
+    <label class="f">Eventuale stima tecnica dichiarata (%)
+      <input type="number" min="0" max="100" step="any" value="${esc(p.stimaLibera)}" oninput="aggiornaStimaLiberaIrrigua(${i},this.value)"><small>Dato libero separato: non sostituisce l'indice ufficiale e non determina ammissibilità o P1.</small>
+    </label>
+  </div><p class="hint">${m?esc(m.requisiti)+". ":""}M2.1 registra i dati; la verifica dei parametri e le decisioni su ammissibilità, CR21, titoli e P1 saranno sviluppate nelle milestone successive.</p>`;
+}
 function specHTML(v, i){
   switch(v.cat){
     case "M": case "M40": {
@@ -650,13 +789,7 @@ function specHTML(v, i){
       <div class="chk"><input type="checkbox" ${v.urbanistica?"checked":""} onchange="updVoceChk(${i},'urbanistica',this.checked)"><span>Investimento <b>consentito dagli strumenti urbanistici vigenti</b> (requisito di ammissibilità, DAdG 49/2026)</span></div>
       <div class="chk"><input type="checkbox" ${v.destProduttiva?"checked":""} onchange="updVoceChk(${i},'destProduttiva',this.checked)"><span>Destinazione d'uso <b>produttiva</b> agricola/zootecnica (requisito di ammissibilità)</span></div>
       <p class="hint">Richiede DOC09 (computo metrico estimativo redatto esclusivamente sul Prezzario regionale OOPP Puglia edizione 2026, DGR 774/2026), DOC08 (relazione asseverata cantierabilità/conformità urbanistica) e DOC10 (titoli abilitativi o prova della richiesta).</p>`;
-    case "IRR": return `<div class="grid">
-        <label class="f">Indice di efficienza dell'impianto (%)<input type="number" min="0" max="100" value="${esc(v.efficienza)}" oninput="updVoce(${i},'efficienza',this.value)"><small>Prioritario se nuovo impianto con efficienza ≥ 85% (≥ 80% se solo acque reflue)</small></label>
-      </div>
-      <div class="chk"><input type="checkbox" ${v.nuovo?"checked":""} onchange="updVoceChk(${i},'nuovo',this.checked)"><span><b>Nuovo impianto</b> irriguo (i completamenti funzionali di impianti esistenti non sono nuovi impianti: non prioritari)</span></div>
-      <div class="chk"><input type="checkbox" ${v.reflue?"checked":""} onchange="updVoceChk(${i},'reflue',this.checked)"><span>Utilizzo <b>esclusivo di acque reflue</b> affinate (serve la dichiarazione di consenso dell'Ente gestore)</span></div>
-      <div class="chk"><input type="checkbox" ${v.autorizzazione?"checked":""} onchange="updVoceChk(${i},'autorizzazione',this.checked)"><span><b>Concessione / autorizzazione</b> all'emungimento, prelievo consortile o consenso reflue già disponibile (DOC04). È condizione di ammissibilità al rilascio della DdS; per i pozzi basta l'avvio dell'iter di concessione o rinnovo.</span></div>
-      <div class="chk"><input type="checkbox" ${v.contatori?"checked":""} onchange="updVoceChk(${i},'contatori',this.checked)"><span><b>Misuratori di consumo idrico</b> presenti o previsti in progetto</span></div>`;
+    case "IRR": return irrigazioneHTML(v,i);
     case "INV": return `<div class="grid">
         <label class="f">Capacità invaso (mc)<input type="number" min="0" value="${esc(v.capacita)}" oninput="updVoce(${i},'capacita',this.value)"><small>Prioritario se &lt; 250.000 mc</small></label>
       </div>
@@ -769,17 +902,16 @@ function analizzaVoce(v){
       break;
     }
     case "IRR": {
-      const eff = parseFloat(v.efficienza)||0;
-      const soglia = v.reflue ? 80 : 85;
-      if (!v.nuovo) r.note.push("Non è un nuovo impianto (miglioramento o completamento dell'esistente) → non prioritaria; serve la valutazione ex-ante del risparmio idrico");
-      else if (eff >= soglia){ r.prio=true; r.note.push("Nuovo impianto, efficienza "+eff+"% ≥ "+soglia+"%"+(v.reflue?" (solo acque reflue)":"")+" → prioritaria"); }
-      else r.note.push("Efficienza "+eff+"% < "+soglia+"%"+(v.reflue?" (solo acque reflue)":"")+" → non prioritaria");
+      const ir=normalizzaIrrigazione(v.irrigazione,v.efficienza);
+      const metodo=metodoIrriguo(ir.impiantoProposto.codiceMetodo,true);
+      r.ammStato="NON VERIFICABILE";
+      r.prioStato="NON VERIFICABILE";
+      r.note.push("M2.1: ammissibilità e qualifica P1 non ancora verificate; l'importo entra solo nelle stime preliminari.");
+      if (ir.classificazione.dichiarata) r.note.push("Classificazione dichiarata: "+(CLASSIFICAZIONI_IRRIGUE[ir.classificazione.dichiarata]||"da chiarire")+"; conferma tecnica non acquisita.");
+      if (metodo) r.note.push("Metodo proposto "+metodo.codice+" — indice ufficiale "+metodo.indice+"% da Allegato 5, pp. PDF 64-65; caratteristiche tecniche da verificare.");
+      else r.note.push("Metodo proposto non identificato tra i codici 12–17 o non pertinente: indice ufficiale non disponibile.");
+      if (ir.impiantoProposto.stimaLibera!=="") r.note.push("Stima libera dichiarata "+ir.impiantoProposto.stimaLibera+"%: non usata per ammissibilità o P1.");
       r.docs.push("DOC04","DOC12");
-      if (v.reflue) r.note.push("Acque reflue: allegare la dichiarazione di consenso alla distribuzione rilasciata dall'Ente gestore");
-      if (v.pozzo) { r.note.push("Pozzo presente sulle particelle selezionate"+(v.autorizzazione?" (concessione dichiarata)":" → serve concessione valida o avvio dell'iter di concessione/rinnovo, DOC04")); }
-      else if (!v.reflue) { r.note.push("⚠ Indicare la fonte idrica (pozzo, prelievo consortile o acque reflue)"); }
-      if (!v.autorizzazione) r.note.push("⚠ Senza concessione irrigua, prelievo consortile o consenso reflue al rilascio della DdS la voce è inammissibile (per i pozzi basta l'avvio dell'iter)");
-      if (!v.contatori) r.note.push("⚠ Obbligo di installazione di misuratori di consumo idrico");
       break;
     }
     case "INV": {
@@ -996,6 +1128,7 @@ function calcola(vociParam){
     return a;
   });
   const ammesse = analisi.filter(a=>a.amm);
+  const irrigazioneNonVerificata=ammesse.some(a=>a.voce.cat==="IRR" && a.ammStato==="NON VERIFICABILE");
   const escluse = analisi.filter(a=>!a.amm);
   const spesaAmmessa = ammesse.reduce((s,a)=>s+(a.voce.importo||0),0);
   const spesaPrioritaria = ammesse.filter(a=>a.prio).reduce((s,a)=>s+(a.voce.importo||0),0);
@@ -1107,6 +1240,7 @@ function calcola(vociParam){
   let p1=0, p1note, p1inc=null;
   if (costoInv==null || costoInv===0) { p1=null; p1note="DATO MANCANTE: costo totale progetto — calcolo non eseguito."; }
   else if (voci.length===0) { p1=0; p1note="Nessuna voce di spesa dettagliata inserita: incidenza investimenti prioritari non determinabile → 0 pt prudenziale."; }
+  else if (irrigazioneNonVerificata) { p1=null; p1note="NON VERIFICABILE: una o più voci irrigue non hanno ancora qualifica prioritaria consolidata. M2.1 non attribuisce un punteggio P1 definitivo."; }
   else {
     p1inc = Math.min(100, spesaPrioritaria / costoInv * 100);
     if (p1inc >= 30 && p1inc <= 40) p1=2;
@@ -1205,6 +1339,7 @@ function calcola(vociParam){
   let esito, esitoCls, esitoMsg;
   if (bocciato) { esito="CRITICITÀ RILEVANTI"; esitoCls="ko"; esitoMsg="Uno o più requisiti minimi dichiarati risultano non soddisfatti: non è consigliabile procedere senza modifiche o verifiche documentali."; }
   else if (datiMancantiKC) { esito="DA APPROFONDIRE"; esitoCls="warn"; esitoMsg="Dati mancanti sui requisiti minimi: integrare le informazioni prima del conferimento o della presentazione della domanda."; }
+  else if (irrigazioneNonVerificata) { esito="DA APPROFONDIRE"; esitoCls="warn"; esitoMsg="Investimento irriguo registrato in M2.1: ammissibilità e P1 non consolidati; importi e altri punteggi dipendenti dalla spesa sono preliminari. La soglia di selezione non è ancora verificabile."; }
   else if (!sogliaOk) { esito="DA RIVEDERE"; esitoCls="ko"; esitoMsg="Requisiti minimi dichiarati soddisfatti, ma punteggio orientativo "+totale.toLocaleString("it-IT",{maximumFractionDigits:2})+" pt < soglia minima 30 pt."; }
   else { esito="POTENZIALMENTE AMMISSIBILE"; esitoCls="ok"; esitoMsg="Dati dichiarati compatibili con i requisiti minimi e punteggio orientativo sopra la soglia di 30 pt."; }
 
@@ -1279,9 +1414,9 @@ function calcola(vociParam){
   if (docSet.has("DOC19")) docProfilo.push("Delibera di mutuo (almeno il 50% dell'investimento) o attestazione bancaria della giacenza media annua");
   if (inp.p6>0) docProfilo.push("Domanda di partecipazione interventi SRA");
 
-  ultimoEsito = { input:inp, voci, particelleFascicolo, analisiVoci:analisi.map(a=>({desc:a.voce.desc, cat:a.voce.cat, comparto:a.voce.comparto, importo:a.voce.importo, ammissibile:a.amm, prioritaria:a.prio, aliquota:a.aliquota, note:a.note, docs:a.docs, particelle:a.voce.particelle, pozzo:a.voce.pozzo})),
-    investimentiAmmessi:costoInv, speseGenerali:sg, speseGeneraliPerLinea:sgLinee, spesaAmmessa:costoTot, spesaPrioritaria, spesaEsclusa, giovane, donna, etaAllaScadenzaDdS:eta,
-    killerCriteria:kc, esito, aliquotaMedia:aliquota, contributo, punteggi:pts, totale, datiMancanti:datiMancantiPts,
+  ultimoEsito = { input:inp, voci, particelleFascicolo, analisiVoci:analisi.map(a=>({desc:a.voce.desc, cat:a.voce.cat, comparto:a.voce.comparto, importo:a.voce.importo, ammissibile:a.ammStato?null:a.amm, statoAmmissibilita:a.ammStato||null, prioritaria:a.prioStato?null:a.prio, statoPriorita:a.prioStato||null, aliquota:a.aliquota, note:a.note, docs:a.docs, particelle:a.voce.particelle, pozzo:a.voce.pozzo})),
+    investimentiAmmessi:irrigazioneNonVerificata?null:costoInv, investimentiPreliminari:costoInv, speseGenerali:sg, speseGeneraliPerLinea:sgLinee, spesaAmmessa:irrigazioneNonVerificata?null:costoTot, spesaPreliminare:costoTot, spesaPrioritaria:irrigazioneNonVerificata?null:spesaPrioritaria, spesaEsclusa, giovane, donna, etaAllaScadenzaDdS:eta,
+    killerCriteria:kc, esito, aliquotaMedia:aliquota, contributo:irrigazioneNonVerificata?null:contributo, contributoPreliminare:contributo, punteggi:pts, totale:irrigazioneNonVerificata?null:totale, punteggioParziale:totale, datiMancanti:datiMancantiPts,
     documenti:docList, documentiProfilo:docProfilo, obbligoSIAN:richiedeSIAN };
 
   // ================= RENDER =================
@@ -1323,14 +1458,14 @@ function calcola(vociParam){
   <table class="r">
     <tr><th style="width:21%">Voce</th><th style="width:16%">Categoria</th><th class="num" style="width:11%">Importo</th><th style="width:11%">Esito</th><th class="num" style="width:7%">Aliq.</th><th>Validazione e documentazione</th></tr>
     ${analisi.map(a=>{
-      const cls = !a.amm ? "fail-row" : a.prio ? "prio-row" : "pass-row";
-      const lbl = !a.amm ? "✘ NON AMMISS." : a.prio ? "★ PRIORITARIA" : "✔ AMMISSIBILE";
+      const cls = !a.amm ? "fail-row" : a.ammStato ? "miss" : a.prio ? "prio-row" : "pass-row";
+      const lbl = !a.amm ? "✘ NON AMMISS." : a.ammStato ? "⚠ NON VERIFICABILE" : a.prio ? "★ PRIORITARIA" : "✔ AMMISSIBILE";
       return `<tr><td>${esc(a.voce.desc)||"—"}${a.voce.cat==="M"||a.voce.cat==="M40" ? (a.voce.marca||a.voce.modello?`<br><small>${esc(a.voce.marca)} ${esc(a.voce.modello)}</small>`:"") : ""}${a.voce.cat==="ARB"&&a.voce.specie?`<br><small>${esc(a.voce.specie)}${a.voce.superficie?", "+esc(a.voce.superficie)+" ha":""}${a.voce.sesto?", sesto "+esc(a.voce.sesto):""}</small>`:""}${a.voce.comparto?`<br><small>Comparto: ${COMPARTI[a.voce.comparto]}</small>`:""}</td>
       <td>${CATEGORIE[a.voce.cat]}</td><td class="num">${EUR(a.voce.importo||0)}</td>
       <td class="${cls}">${lbl}</td><td class="num">${a.amm?a.aliquota+"%":"—"}</td><td>${a.note.map(esc).join("<br>")}${a.amm?`<br><small>Aliquota: ${esc(a.aliquotaMot)}</small>`:""}${a.docs.length?`<br><small>Documenti: <b>${a.docs.join(", ")}</b></small>`:""}${a.particelleTxt?`<br><small>Particelle: ${esc(a.particelleTxt)}</small>`:""}</td></tr>`;
     }).join("")}
-    <tr class="tot"><td colspan="2">Investimenti ammissibili ${spesaEsclusa>0?`(escluse voci non ammissibili: ${EUR(spesaEsclusa)})`:""}</td>
-      <td class="num">${EUR(spesaAmmessa)}</td><td colspan="3">di cui prioritari ai fini P1: ${EUR(spesaPrioritaria)} (${spesaAmmessa>0?PCT(spesaPrioritaria/spesaAmmessa*100):"—"})</td></tr>
+    <tr class="tot"><td colspan="2">${irrigazioneNonVerificata?"Investimenti preliminarmente conteggiati (irrigui da verificare)":"Investimenti ammissibili"} ${spesaEsclusa>0?`(escluse voci non ammissibili: ${EUR(spesaEsclusa)})`:""}</td>
+      <td class="num">${EUR(spesaAmmessa)}</td><td colspan="3">${irrigazioneNonVerificata?"P1 non consolidato; le voci irrigue non sono state qualificate automaticamente.":`di cui prioritari ai fini P1: ${EUR(spesaPrioritaria)} (${spesaAmmessa>0?PCT(spesaPrioritaria/spesaAmmessa*100):"—"})`}</td></tr>
   </table>`;
   }
 
@@ -1338,7 +1473,7 @@ function calcola(vociParam){
     h += `
   <h3 class="r">Fase 2 — Quadro economico e aliquota di sostegno</h3>
   <table class="r">
-    <tr><th>Investimenti ammissibili</th><th>Spese generali</th><th>Spesa complessiva ammissibile</th><th>Aliquota</th><th>Contributo concedibile</th><th>Quota privata</th></tr>
+    <tr><th>${irrigazioneNonVerificata?"Investimenti preliminari":"Investimenti ammissibili"}</th><th>Spese generali</th><th>${irrigazioneNonVerificata?"Spesa complessiva preliminare":"Spesa complessiva ammissibile"}</th><th>Aliquota</th><th>${irrigazioneNonVerificata?"Contributo stimato, da verificare":"Contributo concedibile"}</th><th>Quota privata</th></tr>
     <tr>
       <td class="num">${EUR(costoInv)}</td>
       <td class="num">${EUR(sg)}</td>
@@ -1353,15 +1488,15 @@ function calcola(vociParam){
     ${sgLinee.map(l=>`<tr><td>${l.linea}</td><td class="num">${EUR(l.investimento)}</td><td class="num">${EUR(l.sg)}</td><td class="num">${PCT(l.sg/l.investimento*100)}</td><td class="num">${l.aliquota}%</td></tr>`).join("")}
   </table>` : ""}
   <p class="note">${sgNota}</p>
-  <p class="note">Motivazione aliquota: ${aliquotaNota}</p>
+  <p class="note">Motivazione aliquota: ${aliquotaNota}${irrigazioneNonVerificata?" Le cifre includono voci irrigue non ancora verificate e non costituiscono spesa o contributo ammesso.":""}</p>
 
   <h3 class="r">Fase 3 — Punteggio di selezione (soglia minima 30 pt)</h3>
   <table class="r">
     <tr><th style="width:7%">Princ.</th><th style="width:30%">Criterio</th><th class="num" style="width:9%">Max</th><th class="num" style="width:11%">Punti</th><th>Dettaglio calcolo</th></tr>
     ${pts.map(p=>`<tr><td><b>${p.cod}</b></td><td>${p.nome}</td><td class="num">${p.max}</td>
       <td class="num">${p.pt===null?"<span class='miss'>N.D.</span>":"<b>"+p.pt.toLocaleString("it-IT",{maximumFractionDigits:2})+"</b>"}</td><td>${p.nota}</td></tr>`).join("")}
-    <tr class="tot"><td colspan="2">PUNTEGGIO TOTALE</td><td class="num">100</td><td class="num">${totale.toLocaleString("it-IT",{maximumFractionDigits:2})}</td>
-      <td>${sogliaOk?"≥ 30 pt — soglia minima superata":"< 30 pt — soglia minima NON superata"}${datiMancantiPts.length?" · Principi non calcolati per dati mancanti: "+datiMancantiPts.join(", "):""}</td></tr>
+    <tr class="tot"><td colspan="2">${irrigazioneNonVerificata?"PUNTEGGIO PARZIALE (P1 SOSPESO)":"PUNTEGGIO TOTALE"}</td><td class="num">100</td><td class="num">${totale.toLocaleString("it-IT",{maximumFractionDigits:2})}</td>
+      <td>${irrigazioneNonVerificata?"Soglia non verificabile finché P1 e ammissibilità irrigua non sono consolidati":sogliaOk?"≥ 30 pt — soglia minima superata":"< 30 pt — soglia minima NON superata"}${datiMancantiPts.length?" · Principi non calcolati: "+datiMancantiPts.join(", "):""}</td></tr>
   </table>`;
   }
 
@@ -1896,7 +2031,8 @@ function statoPratica(){
     if (el.type === "file") return;
     campi[el.id] = el.type === "checkbox" ? el.checked : el.value;
   });
-  return { app:"prefattibilita-srd0105", versione:4, salvato:new Date().toISOString(), campi, voci:vociState, particelle:particelleFascicolo };
+  const voci=vociState.map(v=>v.cat==="IRR" ? {...v,irrigazione:normalizzaIrrigazione(v.irrigazione,v.efficienza)} : v);
+  return { app:"prefattibilita-srd0105", versione:5, salvato:new Date().toISOString(), campi, voci, particelle:particelleFascicolo };
 }
 function salvaPratica(){
   const blob = new Blob([JSON.stringify(statoPratica(), null, 2)], { type:"application/json" });
@@ -1921,7 +2057,12 @@ async function apriPratica(file){
     if (el.type === "checkbox") el.checked = !!v; else el.value = v;
   }
   // compatibilità con le pratiche salvate prima della DAdG 49 (campo "zonaAgricola")
-  vociState = (d.voci || []).map(v => { const n = { ...nuovaVoce(), ...v }; if (v.zonaAgricola!=null && v.urbanistica==null) n.urbanistica = v.zonaAgricola; return n; });
+  vociState = (d.voci || []).map(v => {
+    const n = { ...nuovaVoce(), ...v };
+    if (v.zonaAgricola!=null && v.urbanistica==null) n.urbanistica = v.zonaAgricola;
+    if (n.cat==="IRR") n.irrigazione=normalizzaIrrigazione(v.irrigazione,v.efficienza);
+    return n;
+  });
   particelleFascicolo = d.particelle || [];
   renderVoci();
   aggiornaSoggetto();
@@ -1931,6 +2072,7 @@ async function apriPratica(file){
   if ((d.versione||0)<=3 && val("soggettivita")==="IA" && eCooperativa(val("soggettivita"),val("genere"),val("tipoSoc")) && !val("coopConduzione") && !chk("soloSilvAcqua")) avvisi.push("CR01: la cooperativa classificata IA non è più automaticamente CONFORME; senza verifica della conduzione l'esito è NON VERIFICABILE.");
   if ((d.versione||0)<=2 && (val("genere")==="NA" || ["OP","COOP","RETE"].includes(val("soggettivita")))) avvisi.push("DOC03: ora è richiesta una verifica condizionata «ove necessario» degli atti effettivamente dovuti; per le società IA la checklist precedente poteva ometterlo.");
   if ((d.versione||0)<=3 && val("soggettivita")==="RETE" && !val("doc03Regolamento")) avvisi.push("DOC03: per la Rete il Regolamento Interno è richiesto e non risulta verificato; l'esito precedente va rivalutato con questo controllo aggiuntivo.");
+  if ((d.voci||[]).some(v=>v.cat==="IRR" && ((d.versione||0)<5 || !v.irrigazione))) avvisi.push("Irrigazione M2.1: i dati storici (percentuale libera, nuovo impianto, reflue, autorizzazione e contatore) restano dichiarazioni non verificate; non diventano automaticamente classificazione confermata, titolo valido, metodo proposto o priorità P1. Rivedere le voci irrigue.");
   const messaggio="Pratica caricata: "+(val("ditta")||file.name)+(d.salvato?" (salvata il "+new Date(d.salvato).toLocaleString("it-IT")+")":"")+". "+vociState.length+" voci di spesa, "+particelleFascicolo.length+" particelle.";
   setImportStatus(messaggio+(avvisi.length?"\n\nRivalutazione conservativa JSON precedente:\n- "+avvisi.join("\n- "):""), avvisi.length?"warn":"ok");
 }

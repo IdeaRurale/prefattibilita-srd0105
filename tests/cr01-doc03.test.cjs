@@ -242,7 +242,7 @@ test('JSON v2 COOP azzera dati nuovi preesistenti, conserva il file e segnala il
     assert.equal(doc03(app.calculate()).stato, 'DA VERIFICARE');
     assert.match(app.el('importStatus').textContent, /CR01.*NON VERIFICABILE/s);
     assert.deepEqual(fs.readFileSync(oldPath), before, 'il JSON v2 su disco non deve cambiare');
-    assert.equal(app.run('statoPratica()').versione, 4);
+    assert.equal(app.run('statoPratica()').versione, 5);
   } finally {
     if (fs.existsSync(oldPath)) fs.unlinkSync(oldPath);
     fs.rmdirSync(tempDir);
@@ -255,7 +255,7 @@ test('JSON v2 società IA segnala DOC03; nuovi salvataggi restano leggibili', as
   assert.equal(doc03(app.calculate()).stato, 'DA VERIFICARE');
   assert.match(app.el('importStatus').textContent, /DOC03.*ove necessario/s);
   const saved = app.run('statoPratica()');
-  assert.equal(saved.versione, 4);
+  assert.equal(saved.versione, 5);
   assert.ok(Object.hasOwn(saved.campi, 'coopConduzione'));
   assert.ok(Object.hasOwn(saved.campi, 'doc03Necessita'));
 });
@@ -312,7 +312,7 @@ test('nuovo JSON conserva le attestazioni esplicite dopo riapertura', async () =
   app.el('doc03Motivo').value = 'Motivazione conservata';
   app.el('doc03Regolamento').value = 'VERIFICATO';
   const saved = app.run('statoPratica()');
-  assert.equal(saved.versione, 4);
+  assert.equal(saved.versione, 5);
   assert.equal(saved.campi.coopConduzione, 'VERIFICATA');
   assert.equal(saved.campi.doc03Necessita, 'RICHIESTO');
   assert.equal(saved.campi.doc03Documenti, 'VERIFICATI');
