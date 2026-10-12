@@ -127,7 +127,7 @@
 <header class="appbar">
   <h1>Scheda preliminare di prefattibilità — SRD01.05</h1>
   <p>Investimenti produttivi agricoli per la competitività · CSR Puglia 2023–2027 · Pre-studio orientativo su dati dichiarati dal richiedente · Avviso DAdG 37/2026 come modificato dalla DAdG 49/2026</p>
-  <p class="scadenze" id="scadenze">Scadenze (DAdG 49/2026): EIP entro giovedì 15/10/2026 ore 11:59 (dal 13/10 niente nuovi EIP) · DdS entro giovedì 22/10/2026 ore 11:59</p>
+  <p class="scadenze" id="scadenze">Scadenze (DAdG 60/2026): EIP entro giovedì 19/11/2026 ore 11:59 (dal 17/11 niente nuovi EIP) · DdS entro giovedì 26/11/2026 ore 11:59</p>
 </header>
 
 <main>
@@ -736,8 +736,10 @@ const CAR40 = [
 const COMPARTI = { ZOO:"Zootecnico", CER:"Cerealicolo", OLI:"Olivicolo/Oleario", FLO:"Florovivaistico", ORT:"Ortofrutticolo", ALTRO:"Altro comparto" };
 
 // Data di riferimento per l'età del giovane agricoltore: termine ultimo di rilascio
-// della DdS (DAdG 49/2026). Scelta prudenziale: se la DdS parte prima, l'età è la stessa o minore.
-const DATA_RIF_DDS = new Date(2026, 9, 22);
+// della DdS, differito dalla DAdG 60/2026 (operazioni 5-7 entro il 26/11/2026; prima, con la DAdG 49/2026, 22/10/2026).
+// Scelta prudenziale: se la DdS parte prima, l'età è la stessa o minore.
+const DATA_RIF_DDS = new Date(2026, 10, 26);
+const DATA_RIF_DDS_TXT = "26/11/2026";
 
 // Aree delimitate Xylella fastidiosa: le province di Lecce, Brindisi e Taranto ricadono
 // interamente in zona infetta. Per la provincia di Bari la delimitazione (zona infetta,
@@ -1426,11 +1428,11 @@ function aggiornaEta(){
   const ok = eta < 41;
   if (val("genere")==="NA"){
     el.style.color = "var(--grey)";
-    el.textContent = "Età del rappresentante legale al 22/10/2026: "+eta+" anni (per le società conta la compagine sociale, sotto)";
+    el.textContent = "Età del rappresentante legale al "+DATA_RIF_DDS_TXT+": "+eta+" anni (per le società conta la compagine sociale, sotto)";
     return;
   }
   el.style.color = ok ? "var(--blue)" : (chk("p4_giovane") ? "var(--red)" : "var(--grey)");
-  el.textContent = "Età al 22/10/2026 (scadenza DdS): "+eta+" anni"+(ok ? " — compatibile con giovane agricoltore (verificare insediamento negli ultimi 5 anni)" : " — requisito giovane (meno di 41 anni) non soddisfatto");
+  el.textContent = "Età al "+DATA_RIF_DDS_TXT+" (scadenza DdS): "+eta+" anni"+(ok ? " — compatibile con giovane agricoltore (verificare insediamento negli ultimi 5 anni)" : " — requisito giovane (meno di 41 anni) non soddisfatto");
 }
 
 // Codice fiscale di persona fisica → genere e data di nascita (senza omocodia)
@@ -1534,7 +1536,7 @@ function calcola(vociParam){
   };
 
   // ---- Qualifiche dichiarate in fase preliminare ----
-  // Giovane: meno di 41 anni alla DdS (riferimento prudenziale: scadenza del 22/10/2026);
+  // Giovane: meno di 41 anni alla DdS (riferimento prudenziale: scadenza DdS del 26/11/2026, DAdG 60/2026);
   // per le società conta la compagine sociale (vedi statoSoggetto).
   const sog = statoSoggetto();
   const eta = sog.eta;
@@ -1741,7 +1743,7 @@ function calcola(vociParam){
   let p4=0; const p4det=[];
   if (giovane || donna) { p4+=10; p4det.push((sog.societa ? "Società con compagine "+[giovane?"giovane":null, donna?"femminile":null].filter(Boolean).join(" e ")+" ("+sog.compagineNota+")" : (giovane?"Giovane agricoltore dichiarato":"Titolare donna"))+" (10 pt)"); }
   else if (sog.societa) p4det.push("Criterio 4.1 non attribuito: "+sog.nota.trim());
-  else if (giovaneFuoriEta) p4det.push("⚠ Giovane dichiarato ma "+eta+" anni alla scadenza DdS (22/10/2026): criterio 4.1 non attribuito");
+  else if (giovaneFuoriEta) p4det.push("⚠ Giovane dichiarato ma "+eta+" anni alla scadenza DdS ("+DATA_RIF_DDS_TXT+"): criterio 4.1 non attribuito");
   if (inp.p4.cdiap){ p4+=10; p4det.push("Qualifica CD/IAP (10 pt)"); }
   if (inp.p4.dop){ p4+=5; p4det.push("DOP/IGP/Prodotti di Puglia (5 pt)"); }
   if (inp.p4.bio){ p4+=3; p4det.push("Agricoltura Biologica sull'intera superficie aziendale (3 pt)"); }
@@ -1877,7 +1879,7 @@ function calcola(vociParam){
   <table class="r">
     <tr><th style="width:25%">Ditta</th><td>${esc(inp.ditta)||"—"}</td><th style="width:15%">CUAA</th><td>${esc(inp.cuaa)||"—"}</td></tr>
     <tr><th>Soggettività</th><td>${({IA:"Imprenditore Agricolo (art. 2135 c.c.)",OP:"Organizzazione di Produttori",COOP:"Cooperativa agricola",RETE:"Rete di Imprese",ALTRO:"Altro"})[inp.soggettivita]}</td><th>Sede</th><td>${esc(inp.comune)||"—"}</td></tr>
-    <tr><th>${sog.societa?"Rappresentante legale":"Titolare"}</th><td>${sog.societa ? (esc(sog.rl.nome)||"—")+(sog.rl.genere?" · "+(sog.rl.genere==="F"?"donna":"uomo"):"")+(eta!=null?" · "+eta+" anni al 22/10/2026":"") : (inp.genere==="F"?"Donna":"Uomo")+(nascitaFmt?" · nascita "+nascitaFmt:"")}</td>
+    <tr><th>${sog.societa?"Rappresentante legale":"Titolare"}</th><td>${sog.societa ? (esc(sog.rl.nome)||"—")+(sog.rl.genere?" · "+(sog.rl.genere==="F"?"donna":"uomo"):"")+(eta!=null?" · "+eta+" anni al "+DATA_RIF_DDS_TXT:"") : (inp.genere==="F"?"Donna":"Uomo")+(nascitaFmt?" · nascita "+nascitaFmt:"")}</td>
         <th>Giovane / Donna (4.1)</th><td>${sog.societa ? "Giovane: <b>"+(giovane?"SÌ":"no")+"</b> · Donna: <b>"+(donna?"SÌ":"no")+"</b><br><small>"+esc(sog.compagineNota||"compagine non indicata")+"</small>" : (giovane===true?"<b>SÌ</b> dichiarato, da verificare":"No dichiarato")}</td></tr>
   </table>
 
@@ -2180,7 +2182,7 @@ function estraiFascicoloAgea(testoRaw){
     out.campi.rlNome = tit[2].trim();
     const info = infoDaCf(tit[1]);
     if (info){ out.campi.rlGenere = info.genere; out.campi.nascita = info.nascita; }
-    out.note.push("Rappresentante legale: "+out.campi.rlNome+(info?" ("+(info.genere==="F"?"donna":"uomo")+", "+etaAl(info.nascita, DATA_RIF_DDS)+" anni al 22/10/2026)":"")+". Per il criterio 4.1 e l'aliquota 80% indica la compagine sociale nella sezione 1 (dati dalla visura camerale).");
+    out.note.push("Rappresentante legale: "+out.campi.rlNome+(info?" ("+(info.genere==="F"?"donna":"uomo")+", "+etaAl(info.nascita, DATA_RIF_DDS)+" anni al "+DATA_RIF_DDS_TXT+")":"")+". Per il criterio 4.1 e l'aliquota 80% indica la compagine sociale nella sezione 1 (dati dalla visura camerale).");
   }
 
   // Tabella della Produzione Standard: delimitata tra l'intestazione OTE/PS e l'inizio
