@@ -124,10 +124,10 @@ test('nuovo JSON v5 riapre modello, parametri, fonti, titoli, importi e giudizio
   app.run("vociState[0].irrigazione.impiantoExAnte.codiceMetodo='07'");
   app.run("vociState[0].irrigazione.fontiIdriche.push({...nuovaFonteIdrica(),id:'F1',tipo:'POZZO',usataDaInvestimento:true})");
   app.run("vociState[0].irrigazione.titoliProcedimenti.push({...nuovoTitoloIdrico(),fonteId:'F1',procedimento:{...nuovoTitoloIdrico().procedimento,oggetto:'IGNOTO'}})");
-  app.run("vociState[0].irrigazione.importi={richiesto:10000,ammissibile:null}");
+  app.run("vociState[0].importo=10000; vociState[0].irrigazione.importi={richiesto:10000,ammissibile:null}");
   app.run("vociState[0].irrigazione.giudizioAgronomo={motivazione:'Da valutare',autore:'Tecnico',data:'2026-10-02'}");
   const saved=JSON.parse(JSON.stringify(app.run('statoPratica()')));
-  assert.equal(saved.versione,5);
+  assert.equal(saved.versione,6);
   assert.equal(saved.voci[0].irrigazione.impiantoExAnte.indiceNormativo,60);
   assert.equal(saved.voci[0].irrigazione.impiantoProposto.indiceNormativo,85);
   await app.load(saved);
@@ -153,7 +153,7 @@ for (const versione of [2,3,4]) {
     ],particelle:[]});
     const saved=JSON.parse(JSON.stringify(app.run('statoPratica()')));
     const v=saved.voci[0], ir=v.irrigazione;
-    assert.equal(saved.versione,5);
+    assert.equal(saved.versione,6);
     assert.equal(v.efficienza,'88', 'dato originale conservato');
     assert.equal(ir.impiantoProposto.stimaLibera,'88');
     assert.equal(ir.classificazione.dichiarata,'');
