@@ -46,17 +46,20 @@ const particelle = [
   { comune:'GALLIPOLI', foglio:'34', particella:'45', forma:'Affitto', supHa:2.0327, supCatastale:2.087 },
 ];
 
-test('quadro particellare: righe delle voci e con superfici indicate, totali in ettari', () => {
+test('quadro particellare: solo le particelle dell\'intervento, totali in ettari', () => {
   const app = browser();
   app.run(`particelleFascicolo = ${JSON.stringify(particelle)}`);
   app.run("aggiornaSupParticella(0,'supIrrigua','0,05'); aggiornaSupParticella(1,'supIrrigua','0.4'); aggiornaSupParticella(2,'supIrrigua','29.55'); aggiornaSupParticella(2,'supProgetto','6')");
   const h = app.run(`quadroParticellareHTML(particelleFascicolo, [{cat:'ARB', particelle:['GALLIPOLI|34|141']}])`);
-  assert.match(h, /<td>43<\/td>/);
-  assert.match(h, /<td>48<\/td>/);
   assert.match(h, /<td>141<\/td>/);
+  assert.doesNotMatch(h, /<td>43<\/td>/, 'superficie irrigua senza progetto non basta');
+  assert.doesNotMatch(h, /<td>48<\/td>/, 'superficie irrigua senza progetto non basta');
   assert.doesNotMatch(h, /<td>45<\/td>/, 'particella senza voci né superfici esclusa');
-  assert.match(h, /1,4530/, 'usa la superficie catastale, non la condotta');
-  assert.match(h, /Totale<\/td><td class="num">37,8613<\/td><td class="num">30,0000<\/td><td class="num">6,0000<\/td>/);
+  assert.match(h, /Totale<\/td><td class="num">36,1463<\/td><td class="num">29,5500<\/td><td class="num">6,0000<\/td>/);
+  app.run("aggiornaSupParticella(1,'supProgetto','0.4')");
+  const h2 = app.run(`quadroParticellareHTML(particelleFascicolo, [{cat:'ARB', particelle:['GALLIPOLI|34|141']}])`);
+  assert.match(h2, /<td>48<\/td>/, 'superficie di progetto > 0 include la particella');
+  assert.match(h2, /1,4530/, 'usa la superficie catastale, non la condotta');
 });
 
 test('quadro particellare: vuoto senza voci su terreno né superfici; i beni mobili non lo attivano', () => {

@@ -314,7 +314,7 @@
   <button type="button" class="ghost small" onclick="addVoce()">＋ Aggiungi voce di spesa</button>
   <div class="part-box" style="margin-top:14px">
     <div class="part-title">Quadro particellare dell'intervento</div>
-    <p class="hint">Superfici in ettari. La catastale è letta dal fascicolo (correggibile); irrigua e oggetto di progetto si indicano a mano. Nel report compaiono le particelle selezionate nelle voci di spesa e quelle con una superficie irrigua o di progetto indicata.</p>
+    <p class="hint">Superfici in ettari. La catastale è letta dal fascicolo (correggibile); irrigua e oggetto di progetto si indicano a mano. Nel report compaiono solo le particelle interessate dall'intervento: quelle selezionate nelle voci di spesa o con superficie oggetto di progetto maggiore di zero.</p>
     <div id="quadroPartBox"></div>
   </div>
 </fieldset>
@@ -915,7 +915,7 @@ function aggiornaSupParticella(i, campo, valore){
 }
 function righeQuadroParticellare(particelle, voci){
   const usate = new Set(voci.flatMap(v=>CAT_TERRENO.has(v.cat) ? (v.particelle||[]) : []));
-  return particelle.filter(p => usate.has(chiaveParticella(p)) || p.supIrrigua!=null || p.supProgetto!=null);
+  return particelle.filter(p => usate.has(chiaveParticella(p)) || p.supProgetto > 0);
 }
 function quadroParticellareHTML(particelle, voci){
   const righe = righeQuadroParticellare(particelle, voci);
