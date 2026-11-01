@@ -105,6 +105,11 @@
   .declarations p{margin:6px 0}
   .disclaimer{margin-top:22px;font-size:11.5px;color:var(--grey);border-top:1px solid var(--line);padding-top:12px}
   .firma{margin-top:34px;display:flex;justify-content:flex-end}
+  .firma-luogo{margin-top:26px;font-size:13px}
+  .declarations ol{margin:6px 0 6px 18px;padding:0}
+  .declarations ol>li{margin:6px 0}
+  .declarations ul{margin:4px 0 4px 16px;padding:0}
+  .declarations ul li{margin:2px 0}
   .firma.dual{justify-content:space-between;gap:40px}
   .firma .box{text-align:center;font-size:13px}
   .firma .box .nome{font-weight:700;margin-top:34px;border-top:1px solid var(--ink);padding-top:6px}
@@ -1605,11 +1610,7 @@ function calcola(vociParam){
   </ul>`;
 
   h += `
-  <h3 class="r">Dichiarazioni preliminari</h3>
-  <div class="declarations">
-    <p><b>Dati dichiarati.</b> Il richiedente dichiara che le informazioni utilizzate per la presente scheda preliminare corrispondono a quanto riferito in sede di colloquio e si impegna a produrre la documentazione necessaria alle verifiche successive.</p>
-    <p><b>Natura del documento.</b> La presente scheda ha finalità orientativa e propedeutica al conferimento dell'incarico tecnico. Non costituisce asseverazione, Domanda di Sostegno, garanzia di ammissibilità o garanzia di finanziamento.</p>
-  </div>
+  ${dichiarazioneRichiedenteHTML(inp, sog, giovane, donna, vociState, particelleFascicolo)}
 
   <div class="disclaimer">
     Il presente pre-studio è elaborato sulla base dei parametri dichiarati dal richiedente e non sostituisce le verifiche
@@ -1623,10 +1624,12 @@ function calcola(vociParam){
     generali sono stimate con la Metodologia ISMEA di novembre 2025 e vanno confermate con il foglio di calcolo ufficiale.
   </div>
 
+  <div class="firma-luogo">Luogo e data ______________________________</div>
   <div class="firma dual">
     <div class="box">
-      Il Richiedente<br>
-      <div class="nome">${esc(inp.ditta)||"Firma per presa visione"}</div>
+      Il Richiedente — ${sog.societa?"il legale rappresentante (timbro e firma)":"il titolare"}<br>
+      <div class="nome">${esc(inp.ditta)||"Firma"}${sog.societa&&sog.rl&&sog.rl.nome?`<br><small style="font-weight:400">${esc(sog.rl.nome)}</small>`:""}</div>
+      <div class="nome">Firma per approvazione specifica dei punti 2, 3, 4 e 6 (artt. 1341 e 1342 c.c.)</div>
     </div>
     <div class="box">
       Il Tecnico<br>
@@ -2126,6 +2129,64 @@ function noteTecnicheHTML(testo){
     chiudi();
     return h;
   }).join("");
+}
+
+// Dati che la scheda assume dalla ditta e su cui si fondano esito, aliquota e punteggio.
+function elementiDichiarati(inp, sog, giovane, donna, voci, particelle){
+  const el = [];
+  el.push("dati anagrafici e societari"+(inp.ditta?" di "+inp.ditta:"")+(inp.cuaa?" (CUAA "+inp.cuaa+")":"")+", forma giuridica e poteri di rappresentanza");
+  if (sog.societa){
+    if (donna) el.push("compagine sociale: oltre il 50% del capitale e la maggioranza degli amministratori sono donne (criterio 4.1)");
+    if (giovane) el.push("compagine sociale: requisiti di giovane agricoltore dei soci e degli amministratori indicati (criterio 4.1 e aliquota)");
+  } else {
+    if (giovane) el.push("età e insediamento come giovane agricoltore (criterio 4.1 e aliquota 80%)");
+    if (donna) el.push("titolare donna (criterio 4.1)");
+  }
+  if (inp.psTotale!=null) el.push("dimensione economica (produzione standard "+EUR(inp.psTotale)+") e consistenza aziendale risultanti dal fascicolo aziendale, che è aggiornato e validato");
+  const p4 = inp.p4||{};
+  if (p4.cdiap) el.push("qualifica di coltivatore diretto o IAP"+(sog.societa?" della società":"")+" (criterio 4.2)");
+  if (p4.dop) el.push("adesione a regimi DOP, IGP o Prodotti di Qualità Puglia (criterio 4.3.a)");
+  if (p4.bio) el.push("notifica in agricoltura biologica dell'intera superficie aziendale (criterio 4.3.b)");
+  if (p4.coop) el.push("adesione a cooperativa, OP o rete, o accordo di filiera, con conferimenti o accordi conformi all'Avviso per il comparto del progetto (criterio 4.4)");
+  if (p4.rlaq) el.push("iscrizione, o domanda di iscrizione, alla Rete del Lavoro Agricolo di Qualità (criterio 4.5)");
+  if (p4.nuovo) el.push("di non essere già stato ammesso agli aiuti SRD01 del CSR 2023–2027, salvo formale rinuncia (criterio 4.6)");
+  if (inp.giaAmmesso>0) el.push("investimenti SRD01 già ammessi nel periodo pari a "+EUR(inp.giaAmmesso)+" (CR28)");
+  else el.push("assenza di altri investimenti SRD01 già ammessi nel periodo 2023–2027 (CR28)");
+  if (inp.p6===1) el.push("partecipazione a un intervento SRA del CSR Puglia (P6)");
+  if (inp.p6===2) el.push("partecipazione a due o più interventi SRA del CSR Puglia, di cui uno SRA24 (P6)");
+  if (inp.p8cant===4) el.push("che l'intervento non necessita di titoli abilitativi, autorizzazioni, pareri o nulla osta, comunque denominati, oppure che sono tutti già posseduti (criterio 8.1)");
+  if (inp.p8cant===2) el.push("di aver presentato agli enti competenti le richieste di tutti i titoli abilitativi necessari (criterio 8.1)");
+  if (inp.p8fin===6) el.push("disponibilità di una deliberazione bancaria di mutuo pari ad almeno il 50% dell'investimento (criterio 8.2)");
+  if (inp.p8fin===4) el.push("giacenza media annua sui conti aziendali pari ad almeno il 50% dell'investimento complessivo (criterio 8.2)");
+  for (const v of voci.filter(v=>v.cat==="IRR")){
+    const c = (v.irrigazione&&v.irrigazione.confermaTecnico)||{};
+    const fatti = [c.classificazione&&"assenza di impianti irrigui esistenti sulle particelle servite", c.titolo&&"titolo idrico valido (concessione o atto equivalente)", c.particelle&&"particelle servite comprese nel titolo, senza estensione oltre la superficie assentita", c.parametri&&"caratteristiche tecniche del sistema irriguo proposto", c.contatore&&"presenza o installazione del contatore volumetrico"].filter(Boolean);
+    if (fatti.length) el.push("per l'impianto irriguo: "+fatti.join("; "));
+  }
+  const righe = righeQuadroParticellare(particelle, voci);
+  if (righe.length) el.push("disponibilità, titolo di conduzione e stato dei luoghi delle particelle interessate ("+righe.map(p=>p.comune+" fg. "+p.foglio+" p. "+p.particella+(p.forma?" in "+p.forma.toLowerCase():"")).join(", ")+"), con le superfici del quadro particellare");
+  if (voci.length) el.push("il programma di investimento, le voci di spesa e gli importi del quadro economico");
+  return el;
+}
+function dichiarazioneRichiedenteHTML(inp, sog, giovane, donna, voci, particelle){
+  const chi = sog.societa ? "Il/La sottoscritto/a "+(sog.rl&&sog.rl.nome?esc(sog.rl.nome):"_______________________")+", in qualità di legale rappresentante di "+(esc(inp.ditta)||"_______________________")
+                          : "Il/La sottoscritto/a "+(esc(inp.ditta)||"_______________________")+", titolare dell'impresa";
+  return `
+  <h3 class="r">Dichiarazione di conferma, mandato e manleva del richiedente</h3>
+  <div class="declarations">
+    <p>${chi}${inp.cuaa?" (CUAA "+esc(inp.cuaa)+")":""}, consapevole che i dati qui confermati saranno riportati nella Domanda di Sostegno e nelle dichiarazioni sostitutive rese ai sensi del D.P.R. 445/2000, con le responsabilità penali previste dall'art. 76 e le conseguenze previste dall'Avviso (esclusione, riduzione del punteggio, decadenza, revoca e recupero del contributo), <b>dichiara</b>:</p>
+    <ol>
+      <li><b>Veridicità e completezza dei dati.</b> Di aver fornito al tecnico tutti i dati e le informazioni riportati nella presente scheda, che ha letto integralmente, comprese le valutazioni tecniche, e di confermarne la veridicità, la completezza e l'attualità. In particolare conferma:
+        <ul>${elementiDichiarati(inp, sog, giovane, donna, voci, particelle).map(x=>`<li>${esc(x)}</li>`).join("")}</ul></li>
+      <li><b>Dati assunti senza verifica documentale.</b> Di essere consapevole che il tecnico ha utilizzato in buona fede i dati dichiarati, senza verificarli documentalmente in questa fase, e che esito, aliquota, contributo e punteggio dipendono dalla loro veridicità e dalla consegna delle prove. Si impegna a consegnare al tecnico, prima della redazione della Domanda di Sostegno, la documentazione indicata nella check-list e nelle valutazioni tecniche. In mancanza, o in caso di difformità, i relativi requisiti e punteggi non potranno essere dichiarati.</li>
+      <li><b>Approvazione del progetto e mandato al tecnico.</b> Di approvare la proposta progettuale descritta nella scheda (localizzazione, particelle e superfici, interventi, scelte tecniche, voci di spesa e importi) e di dare mandato al tecnico di sviluppare il progetto definitivo e la Domanda di Sostegno in conformità a tali indicazioni. Ogni modifica successiva richiesta dal richiedente sarà comunicata per iscritto e comporterà una nuova valutazione di ammissibilità, punteggio, quadro economico ed eventualmente del compenso professionale.</li>
+      <li><b>Presa d'atto delle criticità e natura del documento.</b> Di aver preso visione delle criticità e delle condizioni segnalate dal tecnico e di accettarle consapevolmente. Di sapere che la scheda ha valore preliminare e orientativo: non è un'asseverazione né una Domanda di Sostegno, e non garantisce ammissibilità, punteggio o finanziamento, che restano di competenza dell'Autorità di Gestione.</li>
+      <li><b>Obbligo di aggiornamento.</b> Di comunicare per iscritto e tempestivamente al tecnico, fino alla conclusione dell'operazione, ogni variazione dei dati dichiarati: fascicolo aziendale, compagine sociale e amministratori, qualifiche, titoli di conduzione, concessioni e autorizzazioni, adesioni, situazione finanziaria, stato dei luoghi.</li>
+      <li><b>Manleva.</b> Di sollevare e tenere indenne il tecnico da ogni responsabilità, danno, onere o spesa derivanti da dati, dichiarazioni o documenti forniti dal richiedente che risultino non veritieri, incompleti, non aggiornati o consegnati in ritardo; da variazioni non comunicate; da scelte imprenditoriali del richiedente difformi dalle indicazioni del progetto; dalle valutazioni e decisioni discrezionali dell'Autorità di Gestione e degli enti competenti.</li>
+      <li><b>Trattamento dei dati.</b> Di autorizzare il trattamento dei dati personali e aziendali ai sensi del Reg. UE 2016/679 per le finalità dell'incarico e della domanda di sostegno.</li>
+    </ol>
+    <p>Si allega copia del documento di identità del dichiarante in corso di validità.</p>
+  </div>`;
 }
 
 // ================= SALVA / APRI PRATICA =================
