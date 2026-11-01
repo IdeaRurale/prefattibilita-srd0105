@@ -51,6 +51,8 @@
   table.inp th,table.inp td{border:1px solid var(--line);padding:6px 8px;text-align:left}
   table.inp th{background:var(--green-pale);font-size:12.5px}
   table.inp td input{border:1px solid var(--line);border-radius:4px;padding:5px 8px;width:140px}
+  #quadroPartBox{max-height:360px;overflow:auto}
+  #quadroPartBox table.inp td input{width:110px}
   .actions{display:flex;gap:12px;flex-wrap:wrap;margin:22px 0}
   button{font-size:15px;font-weight:700;padding:12px 22px;border-radius:8px;border:none;cursor:pointer}
   button.primary{background:var(--green);color:#fff}
@@ -310,6 +312,11 @@
   <div id="vociBox"></div>
   <div class="vtot" id="vociTot"></div>
   <button type="button" class="ghost small" onclick="addVoce()">＋ Aggiungi voce di spesa</button>
+  <div class="part-box" style="margin-top:14px">
+    <div class="part-title">Quadro particellare dell'intervento</div>
+    <p class="hint">Superfici in ettari. La catastale è letta dal fascicolo (correggibile); irrigua e oggetto di progetto si indicano a mano. Nel report compaiono le particelle selezionate nelle voci di spesa e quelle con una superficie irrigua o di progetto indicata.</p>
+    <div id="quadroPartBox"></div>
+  </div>
 </fieldset>
 
 <!-- ====== P2 COMPARTO ====== -->
@@ -888,6 +895,37 @@ function renderVoci(){
     <div class="vspec">${specHTML(v,i)}${particelleHTML(v,i)}</div>
   </div>`).join("");
   aggiornaTotaleVoci();
+  renderQuadroParticellare();
+}
+
+// ---- Quadro particellare: superficie catastale, irrigua e oggetto di progetto ----
+const HA = v => v==null ? "—" : Number(v).toLocaleString("it-IT",{minimumFractionDigits:4,maximumFractionDigits:4});
+const supCatastaleDi = p => p.supCatastale ?? p.supHa ?? null;
+function renderQuadroParticellare(){
+  const box = document.getElementById("quadroPartBox");
+  if (!box) return;
+  if (!particelleFascicolo.length){ box.innerHTML = `<p class="hint">Nessuna particella: carica il fascicolo o aggiungile dalle voci di spesa.</p>`; return; }
+  const cella = (i,campo,v) => `<td><input type="number" min="0" step="0.0001" value="${v==null?"":v}" oninput="aggiornaSupParticella(${i},'${campo}',this.value)"></td>`;
+  box.innerHTML = `<table class="inp"><tr><th>Agro</th><th>Foglio</th><th>Particella</th><th>Sup. catastale (ha)</th><th>Sup. irrigua (ha)</th><th>Sup. oggetto di progetto (ha)</th></tr>
+    ${particelleFascicolo.map((p,i)=>`<tr><td>${esc(p.comune)}</td><td>${esc(p.foglio)}</td><td>${esc(p.particella)}</td>${cella(i,"supCatastale",supCatastaleDi(p))}${cella(i,"supIrrigua",p.supIrrigua)}${cella(i,"supProgetto",p.supProgetto)}</tr>`).join("")}</table>`;
+}
+function aggiornaSupParticella(i, campo, valore){
+  const n = parseFloat(String(valore).replace(",", "."));
+  particelleFascicolo[i][campo] = Number.isFinite(n) ? n : null;
+}
+function righeQuadroParticellare(particelle, voci){
+  const usate = new Set(voci.flatMap(v=>CAT_TERRENO.has(v.cat) ? (v.particelle||[]) : []));
+  return particelle.filter(p => usate.has(chiaveParticella(p)) || p.supIrrigua!=null || p.supProgetto!=null);
+}
+function quadroParticellareHTML(particelle, voci){
+  const righe = righeQuadroParticellare(particelle, voci);
+  if (!righe.length) return "";
+  const somma = f => righe.reduce((a,p)=>a+(f(p)||0),0);
+  return `<table class="r">
+    <tr><th>Agro</th><th>Foglio</th><th>Particella</th><th class="num">Sup. catastale (ha)</th><th class="num">Sup. irrigua (ha)</th><th class="num">Sup. oggetto di progetto (ha)</th></tr>
+    ${righe.map(p=>`<tr><td>${esc(p.comune)}</td><td>${esc(p.foglio)}</td><td>${esc(p.particella)}</td><td class="num">${HA(supCatastaleDi(p))}</td><td class="num">${HA(p.supIrrigua)}</td><td class="num">${HA(p.supProgetto)}</td></tr>`).join("")}
+    <tr class="tot"><td colspan="3">Totale</td><td class="num">${HA(somma(supCatastaleDi))}</td><td class="num">${HA(somma(p=>p.supIrrigua))}</td><td class="num">${HA(somma(p=>p.supProgetto))}</td></tr>
+  </table>`;
 }
 function aggiornaTotaleVoci(){
   const t = vociState.reduce((a,v)=>a+(v.importo||0),0);
@@ -1464,6 +1502,7 @@ function calcola(vociParam){
   // ================= RENDER =================
   const oggi = new Date().toLocaleDateString("it-IT",{day:"2-digit",month:"long",year:"numeric"});
   const nascitaFmt = inp.nascita ? inp.nascita.split("-").reverse().join("/") : "";
+  const quadroPart = quadroParticellareHTML(particelleFascicolo, vociState);
   let h = `
   <div class="r-head">
     <div>
@@ -1484,6 +1523,8 @@ function calcola(vociParam){
 
   <div class="esito ${esitoCls}"><span class="badge">${esitoCls==="ok"?"✅":esitoCls==="ko"?"⛔":"⚠️"}</span>
     <span>ESITO ORIENTATIVO PRELIMINARE: ${esito}<br><small style="font-weight:400;font-size:13px">${esitoMsg}</small></span></div>
+
+  ${quadroPart ? `<h3 class="r">Quadro particellare dell'intervento</h3>${quadroPart}` : ""}
 
   <h3 class="r">Fase 1 — Verifica requisiti minimi (killer criteria)</h3>
   <table class="r">
@@ -1686,7 +1727,8 @@ function estraiParticelleCatastali(testo){
     const key = comune+"|"+fog+"|"+part;
     if (visti.has(key)) continue;
     visti.add(key);
-    out.push({ comune, foglio:String(+fog), particella:(part.replace(/^0+/,"")||part), forma:formaN, supHa });
+    const supCatastale = surfs.length===3 ? haAaCaToHa(surfs[0]) : null;
+    out.push({ comune, foglio:String(+fog), particella:(part.replace(/^0+/,"")||part), forma:formaN, supHa, supCatastale });
   }
   return out;
 }
