@@ -505,7 +505,8 @@ function nuovaIrrigazione(){
     valutazioneCR21:{applicabilita:"NON_VERIFICATA",datiExAnte:null,metodoValutazione:"",risparmioPotenziale:null,risparmioEffettivo:null,giudizioAgronomo:null},
     p1:{qualifica:"NON VERIFICABILE",statoConsolidamento:"NON_CONSOLIDATO",percorso:"",vociBloccanti:[],baseRichiesta:null,baseAmmissibile:null,scenariInformativi:null,punteggioDefinitivo:null},
     importi:{richiesto:null,ammissibile:null}, tracciabilita:[],
-    giudizioAgronomo:{motivazione:"",autore:"",data:""}
+    giudizioAgronomo:{motivazione:"",autore:"",data:""},
+    confermaTecnico:{classificazione:false,titolo:false,particelle:false,parametri:false,contatore:false}
   };
 }
 function normalizzaIrrigazione(raw, efficienzaLegacy=""){
@@ -519,7 +520,8 @@ function normalizzaIrrigazione(raw, efficienzaLegacy=""){
     contatore:{...base.contatore,...(d.contatore||{})},
     valutazioneCR21:{...base.valutazioneCR21,...(d.valutazioneCR21||{})},
     p1:{...base.p1,...(d.p1||{})}, importi:{...base.importi,...(d.importi||{})},
-    giudizioAgronomo:{...base.giudizioAgronomo,...(d.giudizioAgronomo||{})}
+    giudizioAgronomo:{...base.giudizioAgronomo,...(d.giudizioAgronomo||{})},
+    confermaTecnico:{...base.confermaTecnico,...(d.confermaTecnico||{})}
   };
   if (!raw && efficienzaLegacy!=="" && efficienzaLegacy!=null) n.impiantoProposto.stimaLibera=String(efficienzaLegacy);
   n.impiantoExAnte.indiceNormativo=indiceMetodoIrriguo(n.impiantoExAnte.codiceMetodo);
@@ -762,7 +764,28 @@ function irrigazioneHTML(v,i){
     <label class="f">Eventuale stima tecnica dichiarata (%)
       <input type="number" min="0" max="100" step="any" value="${esc(p.stimaLibera)}" oninput="aggiornaStimaLiberaIrrigua(${i},this.value)"><small>Dato libero separato: non sostituisce l'indice ufficiale e non determina ammissibilità o P1.</small>
     </label>
-  </div><p class="hint">${m?esc(m.requisiti)+". ":""}M2.1 registra i dati; la verifica dei parametri e le decisioni su ammissibilità, CR21, titoli e P1 saranno sviluppate nelle milestone successive.</p>`;
+  </div><p class="hint">${m?esc(m.requisiti)+". ":""}M2.1 registra i dati; senza la conferma del tecnico qui sotto ammissibilità e P1 restano non verificabili.</p>
+  ${confermaIrriguaHTML(ir.confermaTecnico,i)}`;
+}
+// Conferme del tecnico che consolidano la voce irrigua (nuovo impianto, CR14 lett. a).
+const CONFERME_IRRIGUE = {
+  classificazione:"<b>Nuovo impianto</b> confermato: sulle particelle servite non esiste un impianto irriguo (non è ammodernamento né completamento funzionale)",
+  titolo:"<b>Titolo idrico valido</b> verificato: concessione rilasciata, documentazione consortile o consenso per le reflue (DOC04)",
+  particelle:"Le particelle servite sono <b>comprese nel titolo</b>: nessuna estensione fuori dalla superficie assentita",
+  parametri:"<b>Parametri del metodo</b> documentati dal costruttore (es. CV ≤ 5% per goccia e ala gocciolante)",
+  contatore:"<b>Contatore</b> volumetrico installato sul punto di presa o previsto dall'investimento (CR20)"
+};
+function confermaIrriguaHTML(c,i){
+  return `<div class="part-box"><div class="part-title">Conferma del tecnico — consolidamento della voce irrigua</div>
+    ${Object.entries(CONFERME_IRRIGUE).map(([k,l])=>`<div class="chk"><input type="checkbox" ${c&&c[k]?"checked":""} onchange="aggiornaConfermaIrrigua(${i},'${k}',this.checked)"><span>${l}</span></div>`).join("")}
+    <p class="hint">Con tutte le conferme la voce diventa ammissibile; è prioritaria per il P1 (lettera a) se l'indice del metodo proposto è almeno 85%. Le conferme sono responsabilità del tecnico e vanno provate con i documenti indicati.</p></div>`;
+}
+function aggiornaConfermaIrrigua(i,campo,valore){
+  const ir=vociState[i].irrigazione=normalizzaIrrigazione(vociState[i].irrigazione,vociState[i].efficienza);
+  ir.confermaTecnico[campo]=!!valore;
+}
+function irrigazioneConsolidata(ir){
+  return ir.classificazione.dichiarata==="NUOVO_IMPIANTO" && Object.keys(CONFERME_IRRIGUE).every(k=>ir.confermaTecnico[k]===true);
 }
 function specHTML(v, i){
   switch(v.cat){
@@ -915,9 +938,17 @@ function analizzaVoce(v){
     case "IRR": {
       const ir=normalizzaIrrigazione(v.irrigazione,v.efficienza);
       const metodo=metodoIrriguo(ir.impiantoProposto.codiceMetodo,true);
-      r.ammStato="NON VERIFICABILE";
-      r.prioStato="NON VERIFICABILE";
-      r.note.push("M2.1: ammissibilità e qualifica P1 non ancora verificate; l'importo entra solo nelle stime preliminari.");
+      if (irrigazioneConsolidata(ir)){
+        r.note.push("Nuovo impianto irriguo consolidato dal tecnico: classificazione, titolo idrico, particelle, parametri del metodo e contatore confermati.");
+        if (metodo && metodo.indice>=85){ r.prio=true; r.note.push("Indice "+metodo.indice+"% ≥ 85% → prioritaria (P1, lettera a)"); }
+        else r.note.push("Indice del metodo proposto inferiore all'85% o non identificato → ammissibile ma non prioritaria");
+      } else {
+        r.ammStato="NON VERIFICABILE";
+        r.prioStato="NON VERIFICABILE";
+        r.note.push(ir.classificazione.dichiarata && ir.classificazione.dichiarata!=="NUOVO_IMPIANTO"
+          ? "M2.1: il consolidamento tramite conferma del tecnico è disponibile solo per i nuovi impianti; ammissibilità e P1 restano da verificare."
+          : "M2.1: ammissibilità e qualifica P1 non ancora verificate (mancano conferme del tecnico); l'importo entra solo nelle stime preliminari.");
+      }
       if (ir.classificazione.dichiarata) r.note.push("Classificazione dichiarata: "+(CLASSIFICAZIONI_IRRIGUE[ir.classificazione.dichiarata]||"da chiarire")+"; conferma tecnica non acquisita.");
       if (metodo) r.note.push("Metodo proposto "+metodo.codice+" — indice ufficiale "+metodo.indice+"% da Allegato 5, pp. PDF 64-65; caratteristiche tecniche da verificare.");
       else r.note.push("Metodo proposto non identificato tra i codici 12–17 o non pertinente: indice ufficiale non disponibile.");
