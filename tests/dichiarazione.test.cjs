@@ -72,3 +72,25 @@ test('dichiarazione: intestazione, punti con approvazione specifica e testo esca
   for (const t of ['Veridicità e completezza', 'senza verifica documentale', 'mandato al tecnico', 'Presa d\'atto', 'Obbligo di aggiornamento', 'Manleva', 'Trattamento dei dati']) assert.ok(h.includes(t), t);
   assert.equal((h.match(/<li><b>/g) || []).length, 7);
 });
+
+test('documenti: a carico della ditta, senza quelli redatti dal tecnico, coerenti con i requisiti dichiarati', () => {
+  const app = browser();
+  const inp = { ...inpBase, p4:{ cdiap:true, coop:true, nuovo:true }, p8cant:4, p8fin:4 };
+  const voci = [{ cat:'ARB', particelle:['GALLIPOLI|34|141'] }, { cat:'IRR', particelle:['GALLIPOLI|34|141'] }];
+  const particelle = [{ comune:'GALLIPOLI', foglio:'34', particella:'141', forma:'Proprietà', supHa:36.1463 }];
+  const docs = app.run(`documentiDaConsegnare(${JSON.stringify(inp)}, ${JSON.stringify(sogSrl)}, false, true, ${JSON.stringify(voci)}, ${JSON.stringify(particelle)}, ['DOC01','DOC04','DOC05','DOC06','DOC07','DOC11','DOC12','DOC15','DOC19','DOC20','DOC23'])`);
+  const testo = docs.map(d => d.doc + ' [' + d.rif + ']').join(' | ');
+  for (const atteso of [/Visura camerale.*quote del capitale.*\[CR01, criterio 4\.1\]/, /fg\. 34 p\. 141.*\[CR32\]/, /emungimento/, /Tre preventivi/, /giacenza media/, /qualifica CD o IAP/, /conferimenti degli ultimi tre anni/, /domande SRD01/, /non servono titoli abilitativi/, /coefficiente di variazione/, /contatore/, /DURC/]) assert.match(testo, atteso);
+  assert.doesNotMatch(testo, /Relazione Tecnica|Elaborati grafici|Quadro Economico|Proposta professionale/, 'documenti del tecnico esclusi');
+  assert.equal(docs.filter(d => /qualifica CD o IAP/.test(d.doc)).length, 1, 'IAP non duplicato');
+  assert.equal(docs.filter(d => /giacenza media/.test(d.doc)).length, 1, 'giacenza non duplicata');
+  assert.equal(docs.filter(d => /conferiment/.test(d.doc)).length, 1, 'conferimenti non duplicati');
+});
+
+test('documenti: la tabella con la colonna di consegna è nella dichiarazione', () => {
+  const app = browser();
+  const h = app.run(`dichiarazioneRichiedenteHTML(${JSON.stringify(inpBase)}, ${JSON.stringify(sogSrl)}, false, false, [], [], ['DOC01'])`);
+  assert.match(h, /Documento a carico del richiedente/);
+  assert.match(h, /Consegnato il/);
+  assert.match(h, /entro il _+/);
+});

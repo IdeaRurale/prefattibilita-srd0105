@@ -110,6 +110,8 @@
   .declarations ol>li{margin:6px 0}
   .declarations ul{margin:4px 0 4px 16px;padding:0}
   .declarations ul li{margin:2px 0}
+  .declarations table.docs-ditta{margin:8px 0 4px;font-size:12px;background:#fff}
+  .declarations table.docs-ditta td,.declarations table.docs-ditta th{padding:5px 7px}
   .firma.dual{justify-content:space-between;gap:40px}
   .firma .box{text-align:center;font-size:13px}
   .firma .box .nome{font-weight:700;margin-top:34px;border-top:1px solid var(--ink);padding-top:6px}
@@ -1610,7 +1612,7 @@ function calcola(vociParam){
   </ul>`;
 
   h += `
-  ${dichiarazioneRichiedenteHTML(inp, sog, giovane, donna, vociState, particelleFascicolo)}
+  ${dichiarazioneRichiedenteHTML(inp, sog, giovane, donna, vociState, particelleFascicolo, docList.map(d=>d.cod))}
 
   <div class="disclaimer">
     Il presente pre-studio è elaborato sulla base dei parametri dichiarati dal richiedente e non sostituisce le verifiche
@@ -2168,7 +2170,59 @@ function elementiDichiarati(inp, sog, giovane, donna, voci, particelle){
   if (voci.length) el.push("il programma di investimento, le voci di spesa e gli importi del quadro economico");
   return el;
 }
-function dichiarazioneRichiedenteHTML(inp, sog, giovane, donna, voci, particelle){
+// Documenti a carico del richiedente (esclusi quelli redatti dal tecnico o da altri professionisti).
+const DOC_RICHIEDENTE = {
+  DOC01:"Documento di identità in corso di validità del titolare o legale rappresentante",
+  DOC02:"Autorizzazione del proprietario all'investimento e garanzia di rinnovo del titolo per l'intero periodo di impegno; contratti di conduzione registrati",
+  DOC03:"Atto costitutivo, statuto e verbale dell'organo deliberante o dichiarazione dei soggetti con poteri decisionali, ove richiesti",
+  DOC04:"Concessione o autorizzazione all'emungimento (numero, data, scadenza), prelievo consortile o consenso per le reflue, con le particelle servite",
+  DOC10:"Titoli abilitativi edilizi o prova della richiesta",
+  DOC12:"Tre preventivi confrontabili, indipendenti e dettagliati per ogni bene non a costo standard, da acquisire tramite portale SIAN",
+  DOC13:"Dichiarazione di unicità del fornitore (bene unico o innovativo)",
+  DOC15:"Prova del conferimento del prodotto ad associazione, OP o cooperativa",
+  DOC16:"Elenco delle imprese aderenti e documentazione di conferimento (progetto collettivo)",
+  DOC17:"Accordi di filiera pluriennali sottoscritti prima della Domanda di Sostegno",
+  DOC18:"Documentazione di provenienza della materia prima non aziendale",
+  DOC19:"Delibera bancaria di mutuo o attestazione bancaria della giacenza media annua",
+  DOC20:"DSAN sugli impegni e obblighi del beneficiario, da sottoscrivere",
+  DOC21:"DSAN sul divieto di pantouflage, da sottoscrivere",
+  DOC22:"DSAN e dati dei familiari conviventi ai fini della certificazione antimafia",
+  DOC23:"Attestazione della qualifica CD o IAP, o richiesta di attestazione",
+  DOC24:"Preliminare di acquisto dei terreni sottoscritto e registrato",
+  DOC25:"Iscrizione alla Rete del Lavoro Agricolo di Qualità o domanda online INPS"
+};
+function documentiDaConsegnare(inp, sog, giovane, donna, voci, particelle, codiciDoc){
+  const out = [], add = (doc, rif) => { if (!out.some(d=>d.doc===doc)) out.push({doc, rif}); };
+  add("Fascicolo aziendale aggiornato e scheda di validazione utilizzata per la domanda", "CR02, P2, P5");
+  if (sog.societa) add("Visura camerale aggiornata, con soci, quote del capitale e amministratori", "CR01"+(donna||giovane?", criterio 4.1":""));
+  const righe = righeQuadroParticellare(particelle, voci);
+  if (righe.length) add("Visure catastali e titoli di proprietà o di conduzione delle particelle interessate ("+righe.map(p=>"fg. "+p.foglio+" p. "+p.particella).join(", ")+")", "CR32");
+  add("Documento di regolarità contributiva (DURC) e dati per le verifiche sulle cause ostative", "Requisiti di accesso");
+  const p4 = inp.p4||{};
+  // DOC15 e DOC19 sono sostituiti dalle voci specifiche dei criteri 4.4 e 8.2, più precise.
+  const assorbiti = new Set([p4.coop&&"DOC15", inp.p8fin>0&&"DOC19"].filter(Boolean));
+  for (const c of (codiciDoc||[])) if (DOC_RICHIEDENTE[c] && !assorbiti.has(c)) add(DOC_RICHIEDENTE[c], c);
+  if (giovane && !sog.societa) add("Documentazione dell'insediamento come giovane agricoltore", "Criterio 4.1, aliquota 80%");
+  if (p4.cdiap && !(codiciDoc||[]).includes("DOC23")) add(DOC_RICHIEDENTE.DOC23, "Criterio 4.2");
+  if (p4.dop) add("Certificato di adesione a DOP, IGP o Prodotti di Qualità Puglia", "Criterio 4.3.a");
+  if (p4.bio) add("Notifica e certificato di operatore biologico per l'intera superficie aziendale", "Criterio 4.3.b");
+  if (p4.coop) add("Adesione a cooperativa, OP o rete, statuto dell'organismo e prove dei conferimenti degli ultimi tre anni o accordo pluriennale per il comparto del progetto", "Criterio 4.4");
+  if (p4.rlaq && !(codiciDoc||[]).includes("DOC25")) add(DOC_RICHIEDENTE.DOC25, "Criterio 4.5");
+  if (p4.nuovo) add("Elenco delle domande SRD01 presentate nel CSR 2023–2027, con eventuali atti formali di rinuncia", "Criterio 4.6");
+  if (inp.giaAmmesso>0) add("Provvedimenti di concessione degli investimenti SRD01 già ammessi", "CR28");
+  if (inp.p6>0) add("Domande di partecipazione agli interventi SRA", "P6");
+  if (inp.p8cant===4) add("Elementi per attestare che non servono titoli abilitativi (ad esempio parere o comunicazione degli uffici urbanistica e paesaggio del Comune), oppure copia dei titoli già posseduti", "Criterio 8.1");
+  if (inp.p8cant===2) add("Copia delle richieste di tutti i titoli abilitativi presentate agli enti competenti", "Criterio 8.1");
+  if (inp.p8fin===6) add("Deliberazione bancaria di mutuo pari ad almeno il 50% dell'investimento", "Criterio 8.2");
+  if (inp.p8fin===4) add("Attestazione bancaria della giacenza media annua sui conti aziendali pari ad almeno il 50% dell'investimento complessivo, con estratti conto", "Criterio 8.2");
+  if (voci.some(v=>v.cat==="IRR")){
+    add("Scheda tecnica del costruttore del sistema irriguo proposto (es. coefficiente di variazione dei gocciolatori)", "P1, Allegato 5");
+    add("Matricola e documentazione del contatore volumetrico sul punto di presa", "CR20");
+    add("Analisi chimiche dell'acqua irrigua e dati di portata della fonte", "Progetto irriguo");
+  }
+  return out;
+}
+function dichiarazioneRichiedenteHTML(inp, sog, giovane, donna, voci, particelle, codiciDoc){
   const chi = sog.societa ? "Il/La sottoscritto/a "+(sog.rl&&sog.rl.nome?esc(sog.rl.nome):"_______________________")+", in qualità di legale rappresentante di "+(esc(inp.ditta)||"_______________________")
                           : "Il/La sottoscritto/a "+(esc(inp.ditta)||"_______________________")+", titolare dell'impresa";
   return `
@@ -2178,7 +2232,9 @@ function dichiarazioneRichiedenteHTML(inp, sog, giovane, donna, voci, particelle
     <ol>
       <li><b>Veridicità e completezza dei dati.</b> Di aver fornito al tecnico tutti i dati e le informazioni riportati nella presente scheda, che ha letto integralmente, comprese le valutazioni tecniche, e di confermarne la veridicità, la completezza e l'attualità. In particolare conferma:
         <ul>${elementiDichiarati(inp, sog, giovane, donna, voci, particelle).map(x=>`<li>${esc(x)}</li>`).join("")}</ul></li>
-      <li><b>Dati assunti senza verifica documentale.</b> Di essere consapevole che il tecnico ha utilizzato in buona fede i dati dichiarati, senza verificarli documentalmente in questa fase, e che esito, aliquota, contributo e punteggio dipendono dalla loro veridicità e dalla consegna delle prove. Si impegna a consegnare al tecnico, prima della redazione della Domanda di Sostegno, la documentazione indicata nella check-list e nelle valutazioni tecniche. In mancanza, o in caso di difformità, i relativi requisiti e punteggi non potranno essere dichiarati.</li>
+      <li><b>Dati assunti senza verifica documentale e consegna dei documenti.</b> Di essere consapevole che il tecnico ha utilizzato in buona fede i dati dichiarati, senza verificarli documentalmente in questa fase, e che esito, aliquota, contributo e punteggio dipendono dalla loro veridicità e dalla consegna delle prove. Si impegna a consegnare al tecnico, entro il ____________________ e comunque prima della redazione della Domanda di Sostegno, i documenti elencati nella tabella seguente, completi, leggibili e in corso di validità. In mancanza, o in caso di difformità, i relativi requisiti e punteggi non potranno essere dichiarati, e il tecnico non risponde dei ritardi o delle esclusioni che ne derivano.
+        <table class="r docs-ditta"><tr><th style="width:5%">N.</th><th>Documento a carico del richiedente</th><th style="width:20%">Riferimento</th><th style="width:16%">Consegnato il</th></tr>
+        ${documentiDaConsegnare(inp, sog, giovane, donna, voci, particelle, codiciDoc).map((d,i)=>`<tr><td>${i+1}</td><td>${esc(d.doc)}</td><td>${esc(d.rif)}</td><td></td></tr>`).join("")}</table></li>
       <li><b>Approvazione del progetto e mandato al tecnico.</b> Di approvare la proposta progettuale descritta nella scheda (localizzazione, particelle e superfici, interventi, scelte tecniche, voci di spesa e importi) e di dare mandato al tecnico di sviluppare il progetto definitivo e la Domanda di Sostegno in conformità a tali indicazioni. Ogni modifica successiva richiesta dal richiedente sarà comunicata per iscritto e comporterà una nuova valutazione di ammissibilità, punteggio, quadro economico ed eventualmente del compenso professionale.</li>
       <li><b>Presa d'atto delle criticità e natura del documento.</b> Di aver preso visione delle criticità e delle condizioni segnalate dal tecnico e di accettarle consapevolmente. Di sapere che la scheda ha valore preliminare e orientativo: non è un'asseverazione né una Domanda di Sostegno, e non garantisce ammissibilità, punteggio o finanziamento, che restano di competenza dell'Autorità di Gestione.</li>
       <li><b>Obbligo di aggiornamento.</b> Di comunicare per iscritto e tempestivamente al tecnico, fino alla conclusione dell'operazione, ogni variazione dei dati dichiarati: fascicolo aziendale, compagine sociale e amministratori, qualifiche, titoli di conduzione, concessioni e autorizzazioni, adesioni, situazione finanziaria, stato dei luoghi.</li>
